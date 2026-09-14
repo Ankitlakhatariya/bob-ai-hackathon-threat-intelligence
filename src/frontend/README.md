@@ -43,3 +43,28 @@ Frontend for **D2 — Threat Intelligence Correlation & Alert Prioritisation Ass
 
 All sample alerts, incidents, risk scores, and correlation confidence values are
 **simulated demo data**. Nothing here represents a real security event.
+
+## Run
+
+```bash
+cd src/frontend
+npm install
+npm run dev       # http://localhost:5173
+```
+
+## Structure
+
+```
+src/frontend/
+  index.html
+  src/
+    main.tsx              # entry — theme + router providers
+    App.tsx              # route table
+    index.css            # Tailwind v4 + theme tokens (dark-first, light option)
+    components/
+      logo/              # ThreatLensLogo SVG
+      theme/             # ThemeProvider (dark/light)
+    pages/               # one folder per product page (built incrementally)
+    types/               # API contracts (added with data layer)
+    services/            # mock/API service layer (added with data layer)
+```
