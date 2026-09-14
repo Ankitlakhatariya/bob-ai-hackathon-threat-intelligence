@@ -98,3 +98,32 @@ html.light {
     }
   }
 }
+
+/* Print-friendly BLUF briefs: hide app chrome and render clean on white. */
+@media print {
+  aside,
+  header {
+    display: none !important;
+  }
+
+  body {
+    background: #ffffff;
+  }
+
+  :root {
+    color-scheme: light;
+    --background: #ffffff;
+    --surface: #ffffff;
+    --surface-2: #f3f4f6;
+    --border: #d1d5db;
+    --foreground: #111827;
+    --foreground-muted: #4b5563;
+    --primary: #4f46e5;
+    --accent: #0891b2;
+    --critical: #b91c1c;
+    --high: #c2410c;
+    --medium: #a16207;
+    --low: #1d4ed8;
+    --safe: #15803d;
+  }
+}
