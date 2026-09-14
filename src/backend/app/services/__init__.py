@@ -6,6 +6,7 @@ from app.services.intelligence import ThreatIntelService
 from app.services.mitre_service import MitreService
 from app.services.bluf_service import BlufService
 from app.services.ingestion import AlertIngestionEngine
+from app.services.investigation_service import InvestigationService
 
 __all__ = [
     "CorrelationEngine",
@@ -14,4 +15,6 @@ __all__ = [
     "MitreService",
     "BlufService",
     "AlertIngestionEngine",
+    "InvestigationService",
 ]
+

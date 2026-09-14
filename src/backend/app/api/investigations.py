@@ -1,57 +1,67 @@
 from typing import List, Optional
 from uuid import UUID
-from datetime import datetime, timezone
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Body, status
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+
 from app.core.dependencies import get_db, require_permission, get_current_user
 from app.core.permissions import Permission
-from app.models.investigation import Investigation, InvestigationStatus, InvestigationPriority
-from app.models.audit_log import AuditLog
+from app.models.user import User
+from app.models.investigation import Investigation
 from app.schemas.investigation import (
     InvestigationRead,
     InvestigationCreate,
     InvestigationUpdate,
     InvestigationNoteCreate,
+    InvestigationResolveRequest,
+    InvestigationFalsePositiveRequest,
+    InvestigationEscalateRequest,
 )
+from app.services.investigation_service import InvestigationService
 
 router = APIRouter()
 
 
-@router.get("", response_model=List[InvestigationRead])
+@router.get(
+    "",
+    response_model=List[InvestigationRead],
+    dependencies=[Depends(require_permission(Permission.INVESTIGATIONS_READ))],
+)
 async def get_investigations(
-    status: Optional[str] = Query(None),
-    priority: Optional[str] = Query(None),
+    status: Optional[str] = Query(None, description="Filter by investigation status (OPEN, IN_PROGRESS, ESCALATED, RESOLVED, FALSE_POSITIVE, CLOSED)"),
+    priority: Optional[str] = Query(None, description="Filter by priority (P1, P2, P3, P4, CRITICAL, HIGH, MEDIUM, LOW)"),
+    threat_id: Optional[str] = Query(None, alias="threatId", description="Filter by associated threat ID"),
+    assigned_analyst: Optional[str] = Query(None, alias="assignedAnalyst", description="Filter by assigned analyst name or email"),
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=100),
     db: AsyncSession = Depends(get_db),
 ):
-    stmt = select(Investigation).order_by(Investigation.created_at.desc())
-    if status:
-        try:
-            stat_enum = InvestigationStatus(status.lower())
-            stmt = stmt.where(Investigation.status == stat_enum)
-        except ValueError:
-            pass
-    if priority:
-        try:
-            prio_enum = InvestigationPriority(priority.upper())
-            stmt = stmt.where(Investigation.priority == prio_enum)
-        except ValueError:
-            pass
-
-    stmt = stmt.offset(skip).limit(limit)
-    res = await db.execute(stmt)
-    return list(res.scalars().all())
+    """Retrieve investigations with optional status, priority, threat, and analyst filters."""
+    return await InvestigationService.get_investigations(
+        db=db,
+        status=status,
+        priority=priority,
+        threat_id=threat_id,
+        assigned_analyst=assigned_analyst,
+        skip=skip,
+        limit=limit,
+    )
 
 
-@router.get("/{investigation_id}", response_model=InvestigationRead)
-async def get_investigation(investigation_id: UUID, db: AsyncSession = Depends(get_db)):
-    case = await db.get(Investigation, investigation_id)
+@router.get(
+    "/{investigation_id}",
+    response_model=InvestigationRead,
+    dependencies=[Depends(require_permission(Permission.INVESTIGATIONS_READ))],
+)
+async def get_investigation(
+    investigation_id: str,
+    db: AsyncSession = Depends(get_db),
+):
+    """Retrieve an investigation by ID (UUID or string identifier)."""
+    case = await InvestigationService.get_investigation(db=db, investigation_id=investigation_id)
     if not case:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail={"error": {"code": "NOT_FOUND", "message": f"Investigation {investigation_id} not found"}},
+            detail={"error": {"code": "NOT_FOUND", "message": f"Investigation '{investigation_id}' not found"}},
         )
     return case
 
@@ -62,31 +72,14 @@ async def get_investigation(investigation_id: UUID, db: AsyncSession = Depends(g
     status_code=status.HTTP_201_CREATED,
     dependencies=[Depends(require_permission(Permission.INVESTIGATIONS_WRITE))],
 )
-async def create_investigation(payload: InvestigationCreate, db: AsyncSession = Depends(get_db)):
-    case = Investigation(
-        title=payload.title,
-        threat_id=payload.threat_id,
-        alert_id=payload.alert_id,
-        priority=payload.priority,
-        assigned_to=payload.assigned_to,
-        notes=payload.notes,
-        findings=payload.findings,
-        status=InvestigationStatus.OPEN,
-    )
-    db.add(case)
-    await db.commit()
-    await db.refresh(case)
-
-    log = AuditLog(
-        action="INVESTIGATION_CREATED",
-        entity_type="investigation",
-        entity_id=str(case.id),
-        details={"title": case.title, "priority": case.priority.value},
-    )
-    db.add(log)
-    await db.commit()
-
-    return case
+async def create_investigation(
+    payload: InvestigationCreate,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Create a new threat investigation case."""
+    user_id = current_user.email or current_user.full_name
+    return await InvestigationService.create_investigation(db=db, payload=payload, user_id=user_id)
 
 
 @router.patch(
@@ -95,35 +88,23 @@ async def create_investigation(payload: InvestigationCreate, db: AsyncSession = 
     dependencies=[Depends(require_permission(Permission.INVESTIGATIONS_WRITE))],
 )
 async def update_investigation(
-    investigation_id: UUID,
+    investigation_id: str,
     payload: InvestigationUpdate,
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    case = await db.get(Investigation, investigation_id)
+    """Update investigation details, status, priority, or assigned analyst."""
+    case = await InvestigationService.get_investigation(db=db, investigation_id=investigation_id)
     if not case:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail={"error": {"code": "NOT_FOUND", "message": f"Investigation {investigation_id} not found"}},
+            detail={"error": {"code": "NOT_FOUND", "message": f"Investigation '{investigation_id}' not found"}},
         )
 
-    if payload.title is not None:
-        case.title = payload.title
-    if payload.status is not None:
-        case.status = payload.status
-    if payload.priority is not None:
-        case.priority = payload.priority
-    if payload.assigned_to is not None:
-        case.assigned_to = payload.assigned_to
-    if payload.notes is not None:
-        case.notes = payload.notes
-    if payload.findings is not None:
-        case.findings = payload.findings
-    if payload.resolution_summary is not None:
-        case.resolution_summary = payload.resolution_summary
-
-    await db.commit()
-    await db.refresh(case)
-    return case
+    user_id = current_user.email or current_user.full_name
+    return await InvestigationService.update_investigation(
+        db=db, case=case, payload=payload, user_id=user_id
+    )
 
 
 @router.post(
@@ -132,24 +113,24 @@ async def update_investigation(
     dependencies=[Depends(require_permission(Permission.INVESTIGATIONS_WRITE))],
 )
 async def add_investigation_note(
-    investigation_id: UUID,
+    investigation_id: str,
     payload: InvestigationNoteCreate,
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    case = await db.get(Investigation, investigation_id)
+    """Add an analyst note to the investigation timeline and audit log."""
+    case = await InvestigationService.get_investigation(db=db, investigation_id=investigation_id)
     if not case:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail={"error": {"code": "NOT_FOUND", "message": f"Investigation {investigation_id} not found"}},
+            detail={"error": {"code": "NOT_FOUND", "message": f"Investigation '{investigation_id}' not found"}},
         )
 
-    timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
-    new_entry = f"\n[{timestamp}] ({payload.author}): {payload.note}"
-    case.notes = (case.notes or "") + new_entry
-
-    await db.commit()
-    await db.refresh(case)
-    return case
+    author = payload.author or current_user.full_name or current_user.email or "Analyst"
+    user_id = current_user.email or current_user.full_name
+    return await InvestigationService.add_note(
+        db=db, case=case, note=payload.note, author=author, user_id=user_id
+    )
 
 
 @router.post(
@@ -158,30 +139,29 @@ async def add_investigation_note(
     dependencies=[Depends(require_permission(Permission.INVESTIGATIONS_WRITE))],
 )
 async def resolve_investigation(
-    investigation_id: UUID,
-    resolution_note: Optional[str] = Query("Threat mitigated and affected assets isolated."),
+    investigation_id: str,
+    payload: Optional[InvestigationResolveRequest] = None,
+    resolution_note: Optional[str] = Query(None, description="Resolution note if not provided in JSON body"),
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    case = await db.get(Investigation, investigation_id)
+    """Resolve an investigation and transition associated threat/alert statuses."""
+    case = await InvestigationService.get_investigation(db=db, investigation_id=investigation_id)
     if not case:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail={"error": {"code": "NOT_FOUND", "message": f"Investigation {investigation_id} not found"}},
+            detail={"error": {"code": "NOT_FOUND", "message": f"Investigation '{investigation_id}' not found"}},
         )
 
-    case.status = InvestigationStatus.RESOLVED
-    case.resolution_summary = resolution_note
-
-    log = AuditLog(
-        action="INVESTIGATION_RESOLVED",
-        entity_type="investigation",
-        entity_id=str(case.id),
-        details={"resolution": resolution_note},
+    summary = (
+        (payload.resolution_summary if payload and payload.resolution_summary else None)
+        or resolution_note
+        or "Threat mitigated and affected assets isolated."
     )
-    db.add(log)
-    await db.commit()
-    await db.refresh(case)
-    return case
+    user_id = current_user.email or current_user.full_name
+    return await InvestigationService.resolve_investigation(
+        db=db, case=case, resolution_summary=summary, user_id=user_id
+    )
 
 
 @router.post(
@@ -190,30 +170,38 @@ async def resolve_investigation(
     dependencies=[Depends(require_permission(Permission.INVESTIGATIONS_WRITE))],
 )
 async def mark_investigation_false_positive(
-    investigation_id: UUID,
-    reason: Optional[str] = Query("Activity verified as benign authorized administrative task."),
+    investigation_id: str,
+    payload: Optional[InvestigationFalsePositiveRequest] = None,
+    reason: Optional[str] = Query(None, description="False positive justification if not provided in body"),
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    case = await db.get(Investigation, investigation_id)
+    """
+    Mark an investigation as FALSE_POSITIVE.
+    CRITICAL RULE: Telemetry evidence and raw alerts are NEVER deleted.
+    """
+    case = await InvestigationService.get_investigation(db=db, investigation_id=investigation_id)
     if not case:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail={"error": {"code": "NOT_FOUND", "message": f"Investigation {investigation_id} not found"}},
+            detail={"error": {"code": "NOT_FOUND", "message": f"Investigation '{investigation_id}' not found"}},
         )
 
-    case.status = InvestigationStatus.FALSE_POSITIVE
-    case.resolution_summary = f"FALSE POSITIVE: {reason}"
-
-    log = AuditLog(
-        action="INVESTIGATION_FALSE_POSITIVE",
-        entity_type="investigation",
-        entity_id=str(case.id),
-        details={"reason": reason},
+    fp_reason = (
+        (payload.reason if payload and payload.reason else None)
+        or reason
+        or "Activity verified as benign authorized administrative task."
     )
-    db.add(log)
-    await db.commit()
-    await db.refresh(case)
-    return case
+    evidence_notes = payload.evidence_notes if payload else None
+    user_id = current_user.email or current_user.full_name
+
+    return await InvestigationService.mark_false_positive(
+        db=db,
+        case=case,
+        reason=fp_reason,
+        user_id=user_id,
+        evidence_notes=evidence_notes,
+    )
 
 
 @router.post(
@@ -222,26 +210,38 @@ async def mark_investigation_false_positive(
     dependencies=[Depends(require_permission(Permission.INVESTIGATIONS_WRITE))],
 )
 async def escalate_investigation(
-    investigation_id: UUID,
-    escalate_to: str = Query("P1", regex="^(P1|P2|P3|P4)$"),
+    investigation_id: str,
+    payload: Optional[InvestigationEscalateRequest] = None,
+    escalate_to: Optional[str] = Query(None, regex="^(P1|P2|P3|P4|CRITICAL|HIGH|MEDIUM|LOW)$"),
+    reason: Optional[str] = Query(None),
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    case = await db.get(Investigation, investigation_id)
+    """Escalate an investigation to ESCALATED status with elevated priority."""
+    case = await InvestigationService.get_investigation(db=db, investigation_id=investigation_id)
     if not case:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail={"error": {"code": "NOT_FOUND", "message": f"Investigation {investigation_id} not found"}},
+            detail={"error": {"code": "NOT_FOUND", "message": f"Investigation '{investigation_id}' not found"}},
         )
 
-    case.priority = InvestigationPriority(escalate_to)
-
-    log = AuditLog(
-        action="INVESTIGATION_ESCALATED",
-        entity_type="investigation",
-        entity_id=str(case.id),
-        details={"priority": escalate_to},
+    target_priority = (
+        (payload.escalate_to if payload and payload.escalate_to else None)
+        or escalate_to
+        or "P1"
     )
-    db.add(log)
-    await db.commit()
-    await db.refresh(case)
-    return case
+    escalate_reason = (
+        (payload.reason if payload and payload.reason else None)
+        or reason
+        or "Escalated for immediate containment and response."
+    )
+    user_id = current_user.email or current_user.full_name
+
+    return await InvestigationService.escalate_investigation(
+        db=db,
+        case=case,
+        escalate_to=target_priority,
+        reason=escalate_reason,
+        user_id=user_id,
+    )
+
