@@ -8,8 +8,8 @@ import { Incidents } from './pages/Incidents'
 import { Mitre } from './pages/Mitre'
 import { Briefs } from './pages/Briefs'
 import { Analytics } from './pages/Analytics'
+import { Settings } from './pages/Settings'
 import { NotFound } from './pages/NotFound'
-import { PageStub } from './pages/PageStub'
 import { AppShell } from './components/layout/AppShell'
 
 export default function App() {
@@ -25,7 +25,7 @@ export default function App() {
         <Route path="/mitre" element={<Mitre />} />
         <Route path="/briefs" element={<Briefs />} />
         <Route path="/analytics" element={<Analytics />} />
-        <Route path="/settings" element={<PageStub title="Settings" />} />
+        <Route path="/settings" element={<Settings />} />
       </Route>
       <Route path="*" element={<NotFound />} />
     </Routes>
