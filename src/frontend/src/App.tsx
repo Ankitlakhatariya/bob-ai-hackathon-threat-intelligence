@@ -7,6 +7,7 @@ import { AlertDetail } from './pages/AlertDetail'
 import { Incidents } from './pages/Incidents'
 import { Mitre } from './pages/Mitre'
 import { Briefs } from './pages/Briefs'
+import { Analytics } from './pages/Analytics'
 import { NotFound } from './pages/NotFound'
 import { PageStub } from './pages/PageStub'
 import { AppShell } from './components/layout/AppShell'
@@ -23,7 +24,7 @@ export default function App() {
         <Route path="/incidents" element={<Incidents />} />
         <Route path="/mitre" element={<Mitre />} />
         <Route path="/briefs" element={<Briefs />} />
-        <Route path="/analytics" element={<PageStub title="Threat analytics" />} />
+        <Route path="/analytics" element={<Analytics />} />
         <Route path="/settings" element={<PageStub title="Settings" />} />
       </Route>
       <Route path="*" element={<NotFound />} />
