@@ -12,45 +12,56 @@ ThreatLens is a specialized threat correlation and alert prioritization engine f
 
 ---
 
-## 2. Multi-Source Alert Ingestion Subsystem
+## 2. Threat Intelligence Subsystem
+
+The threat intelligence subsystem manages Indicators of Compromise (IOCs) and enriches alerts across the pipeline:
+
+### Supported Indicator Types
+- **IP addresses** (`198.51.100.23`)
+- **Domains** (`c2-beacon.darknet.org`)
+- **URLs** (`https://evil-site.com/payload.exe`)
+- **File Hashes** (MD5, SHA1, SHA256)
+- **Email addresses** (`phisher@malicious.com`)
+- **Malware & Tool identifiers** (`mimikatz.exe`, `Cobalt Strike`)
+
+### Indicator Attributes
+- `indicator`: Unique IOC string
+- `indicator_type`: `ip`, `domain`, `url`, `hash`, `email`, `malware`
+- `reputation`: `malicious`, `suspicious`, `benign`, `unknown`
+- `confidence`: Numerical score (0–100)
+- `source`: Attribution feed or analyst source
+- `first_seen` / `last_seen`: Temporal tracking
+- `tags`: Classification labels (`c2`, `ransomware`, `apt29`)
+- `threat_actor`: Attribution group (e.g. `APT28 / Fancy Bear`)
+- `campaign`: Named threat campaign (e.g. `Operation Ghostwriter`)
+- `raw_intelligence`: Complete JSON intelligence context
+
+### Pluggable Provider Abstraction
+Threat intelligence providers implement `AbstractThreatIntelProvider`:
+- Seamlessly replace or add third-party feeds (VirusTotal, AlienVault OTX, AbuseIPDB, MISP).
+- **Strict Anti-Fabrication Guarantee**: If an external provider is not configured or an indicator is unknown, the system strictly returns `reputation: "unknown"`, `found: false` rather than guessing or pretending an indicator is malicious.
+
+### Automated Alert Enrichment
+When an alert is ingested via `POST /api/v1/alerts` or `POST /bulk`, its indicators are automatically checked against the intelligence catalog. Alerts containing verified malicious IOCs receive:
+- **Risk Score Elevation** (+20 points)
+- **Automatic Severity Promotion** (Low/Medium escalated to High)
+- **Attached Intelligence Context** (`metadata_info["threat_intelligence"]`)
+
+---
+
+## 3. Multi-Source Alert Ingestion Subsystem
 
 The ingestion engine accepts security events from heterogeneous telemetry sources without losing raw vendor evidence:
-
-- **SIEM** (IBM QRadar, Splunk, Elastic, ArcSight)
+- **SIEM** (QRadar, Splunk, Elastic, ArcSight)
 - **EDR** (CrowdStrike Falcon, Microsoft Defender, Carbon Black)
 - **Perimeter Firewalls** (Palo Alto Networks, Fortinet, pfSense)
 - **Network Sensors & NIDS** (Zeek, Suricata, Snort)
 - **Threat Intelligence Feeds** (MISP, AlienVault OTX, VirusTotal)
 - **Cyber Sensors & Incident Reports**
 
-### Common Normalized Internal Structure
-Every event is transformed into a common model while preserving 100% of the raw vendor event in `raw_data`:
-
-| Field | Description |
-|---|---|
-| `event_id` | Vendor event identifier |
-| `source` | Normalized source enum (`siem`, `edr`, `network-sensor`, `threat-feed`) |
-| `source_label` | Human-readable source label (e.g. `EDR Endpoint Agent`, `Firewall Sensor`) |
-| `source_type` | Telemetry type (`SIEM`, `EDR`, `Firewall`, `Network Sensor`) |
-| `timestamp` | UTC normalized timestamp |
-| `event_type` | Categorized event type (e.g. `process_execution`, `security_rule_match`) |
-| `severity` | Normalized enum (`critical`, `high`, `medium`, `low`) |
-| `source_ip` / `destination_ip` | Network endpoints (Indexed) |
-| `source_port` / `destination_port` | Transport ports |
-| `protocol` | IP protocol (TCP, UDP, ICMP) |
-| `hostname` | Affected host/workstation (Indexed) |
-| `username` | User account (Indexed) |
-| `domain` | Active Directory or DNS domain |
-| `file_hash` | MD5 or SHA256 executable hash |
-| `process_name` / `command_line` | Process details and command arguments |
-| `url` | Web destination |
-| `indicators` | Automatically extracted IOCs (IPs, domains, hashes) |
-| `metadata` | Preserved metadata parameters |
-| `raw_data` | Complete original JSON payload for audit and forensic inspection |
-
 ---
 
-## 3. Role-Based Access Control (RBAC)
+## 4. Role-Based Access Control (RBAC)
 
 The platform enforces 4 distinct roles with granular permissions:
 
@@ -63,7 +74,7 @@ The platform enforces 4 distinct roles with granular permissions:
 
 ---
 
-## 4. Setup Commands
+## 5. Setup Commands
 
 ### Step 1: Create Virtual Environment
 
@@ -97,8 +108,6 @@ copy .env.example .env
 
 ### Step 4: Run Database Migrations
 
-Apply the database schema, ingestion indexes, and authentication tables to Supabase PostgreSQL:
-
 ```powershell
 alembic upgrade head
 ```
@@ -114,30 +123,16 @@ uvicorn app.main:app --reload --port 5000
 
 ---
 
-## 5. Alert Ingestion & Filtering API
+## 6. Threat Intelligence Endpoints
 
-### Ingestion Endpoints
-- `POST /api/v1/alerts`: Ingest single security alert from any source (auto-normalizes, scores, extracts IOCs, and preserves `raw_data`).
-- `POST /api/v1/alerts/bulk`: High-throughput ingestion of heterogeneous event batches.
-- `PATCH /api/v1/alerts/{id}`: Update alert status, severity, or risk score.
-- `DELETE /api/v1/alerts/{id}`: Delete alert and cascade associated telemetry events.
-
-### Advanced Filtering Parameters (`GET /api/v1/alerts`)
-- `?severity=critical|high|medium|low`
-- `?source=siem|edr|network-sensor|threat-feed`
-- `?status=open|investigating|resolved|false-positive`
-- `?event_type=process_execution|security_rule_match`
-- `?hostname=FINANCE-WS01`
-- `?username=alice.smith`
-- `?ip=198.51.100.50` (matches either source or destination IP)
-- `?start_date=2026-09-01T00:00:00Z&end_date=2026-09-14T23:59:59Z`
-- `?search=mimikatz` (free-text across IDs, hosts, IPs, descriptions)
-- `?sort_by=risk_score&sort_order=desc` (supports `timestamp`, `risk_score`, `severity`, `id`)
-- `?skip=0&limit=50` (pagination)
+- `POST /api/v1/intelligence/indicators`: Ingest a verified IOC into the catalog.
+- `GET /api/v1/intelligence/indicators`: Query indicators with filtering (`type`, `reputation`, `threat_actor`, `campaign`, `search`).
+- `GET /api/v1/intelligence/indicators/{id}`: Detailed record with `raw_intelligence`.
+- `GET /api/v1/intelligence/lookup/{indicator}`: Fast IOC reputation lookup and cross-referencing against existing alerts.
 
 ---
 
-## 6. Running Tests
+## 7. Running Tests
 
 Execute the automated pytest test suite:
 

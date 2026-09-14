@@ -246,10 +246,14 @@ async def create_alert(payload: Dict[str, Any], db: AsyncSession = Depends(get_d
     )
     db.add(event)
 
+    # 6. Enrich alert with threat intelligence if matching indicators found
+    from app.services.intelligence import intel_manager
+    await intel_manager.enrich_alert(db, alert)
+
     await db.commit()
     await db.refresh(alert)
 
-    # 6. Trigger correlation engine
+    # 7. Trigger correlation engine
     try:
         await CorrelationEngine.correlate_alerts(db)
         await db.commit()
