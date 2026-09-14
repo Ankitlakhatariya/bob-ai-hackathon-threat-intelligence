@@ -5,6 +5,7 @@ import { Dashboard } from './pages/Dashboard'
 import { Alerts } from './pages/Alerts'
 import { AlertDetail } from './pages/AlertDetail'
 import { Incidents } from './pages/Incidents'
+import { Mitre } from './pages/Mitre'
 import { NotFound } from './pages/NotFound'
 import { PageStub } from './pages/PageStub'
 import { AppShell } from './components/layout/AppShell'
@@ -19,7 +20,7 @@ export default function App() {
         <Route path="/alerts" element={<Alerts />} />
         <Route path="/alerts/:alertId" element={<AlertDetail />} />
         <Route path="/incidents" element={<Incidents />} />
-        <Route path="/mitre" element={<PageStub title="MITRE ATT&CK explorer" />} />
+        <Route path="/mitre" element={<Mitre />} />
         <Route path="/briefs" element={<PageStub title="BLUF investigation briefs" />} />
         <Route path="/analytics" element={<PageStub title="Threat analytics" />} />
         <Route path="/settings" element={<PageStub title="Settings" />} />
