@@ -46,6 +46,7 @@ class Threat(Base, TimestampMixin):
     confidence: Mapped[int] = mapped_column(Integer, default=70, nullable=False)  # 0-100
     alert_count: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
     affected_assets: Mapped[List[str]] = mapped_column(ARRAY(String), default=list, nullable=False)
+    scoring_factors: Mapped[Optional[Any]] = mapped_column(JSONB, nullable=True)
     first_seen: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         default=lambda: datetime.now(timezone.utc),

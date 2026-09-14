@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 from pydantic import BaseModel, ConfigDict, Field
 from app.models.threat import ThreatStatus, ThreatSeverity
 
@@ -17,6 +17,7 @@ class ThreatBase(BaseModel):
     affected_assets: List[str] = Field(default_factory=list, alias="affectedAssets")
     alert_ids: List[str] = Field(default_factory=list, alias="alertIds")
     mitre_techniques: List[str] = Field(default_factory=list, alias="mitreTechniques")
+    scoring_factors: Optional[Dict[str, int]] = Field(default=None, alias="scoringFactors")
 
 
 class ThreatCreate(ThreatBase):
@@ -56,9 +57,11 @@ class ThreatRead(BaseModel):
     severity: ThreatSeverity
     status: ThreatStatus
     risk_score: int = Field(default=50, serialization_alias="riskScore", validation_alias="risk_score")
+    priority: Optional[str] = None
     confidence: int
     alert_count: int = Field(default=1, serialization_alias="alertCount", validation_alias="alert_count")
     affected_assets: List[str] = Field(default_factory=list, serialization_alias="affectedAssets", validation_alias="affected_assets")
+    scoring_factors: Optional[Dict[str, int]] = Field(default=None, serialization_alias="scoringFactors", validation_alias="scoring_factors")
     first_seen: datetime = Field(serialization_alias="firstSeen", validation_alias="first_seen")
     last_seen: datetime = Field(serialization_alias="lastSeen", validation_alias="last_seen")
 
@@ -67,6 +70,12 @@ class ThreatRead(BaseModel):
     updated_at: datetime = Field(serialization_alias="updatedAt", validation_alias="updated_at")
     alert_ids: List[str] = Field(default_factory=list, serialization_alias="alertIds", validation_alias="alert_ids")
     mitre_techniques: List[str] = Field(default_factory=list, serialization_alias="mitreTechniques", validation_alias="mitre_techniques")
+
+
+class ThreatRiskResponse(BaseModel):
+    risk_score: int
+    priority: str
+    factors: Dict[str, int]
 
 
 class ThreatTimelineEvent(BaseModel):
