@@ -116,6 +116,7 @@ npm run dev
 
 - Authentication and threat feeds are mocked for the prototype.
 - No persistent database or production AI inference integration is included yet.
+- The current WebSocket ConnectionManager is in-memory and suitable for a single-process hackathon deployment. If deployed with multiple Uvicorn workers, events will not automatically propagate between workers.
 - The demo video and hosted deployment are not available yet.
 
 ---

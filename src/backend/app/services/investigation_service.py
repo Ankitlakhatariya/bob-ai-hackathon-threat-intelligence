@@ -78,7 +78,13 @@ class InvestigationService:
         db.add(audit)
         await db.commit()
 
+        await db.commit()
+
         logger.info(f"Investigation {case.id} created for threat={case.threat_id} by {user_id}")
+        
+        from app.services.websocket_manager import ws_manager
+        await ws_manager.broadcast_investigation_event("investigation.created", case)
+        
         return case
 
     @staticmethod
@@ -191,6 +197,10 @@ class InvestigationService:
 
         await db.commit()
         await db.refresh(case)
+        
+        from app.services.websocket_manager import ws_manager
+        await ws_manager.broadcast_investigation_event("investigation.updated", case)
+        
         return case
 
     @staticmethod
@@ -227,6 +237,10 @@ class InvestigationService:
 
         await db.commit()
         await db.refresh(case)
+        
+        from app.services.websocket_manager import ws_manager
+        await ws_manager.broadcast_investigation_event("investigation.updated", case)
+        
         return case
 
     @staticmethod
@@ -279,6 +293,10 @@ class InvestigationService:
 
         await db.commit()
         await db.refresh(case)
+        
+        from app.services.websocket_manager import ws_manager
+        await ws_manager.broadcast_investigation_event("investigation.resolved", case)
+        
         return case
 
     @staticmethod
@@ -341,6 +359,10 @@ class InvestigationService:
 
         await db.commit()
         await db.refresh(case)
+        
+        from app.services.websocket_manager import ws_manager
+        await ws_manager.broadcast_investigation_event("investigation.false_positive", case)
+        
         return case
 
     @staticmethod
@@ -382,4 +404,8 @@ class InvestigationService:
 
         await db.commit()
         await db.refresh(case)
+        
+        from app.services.websocket_manager import ws_manager
+        await ws_manager.broadcast_investigation_event("investigation.escalated", case)
+        
         return case

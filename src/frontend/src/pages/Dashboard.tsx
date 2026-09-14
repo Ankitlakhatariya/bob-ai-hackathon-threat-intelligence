@@ -49,6 +49,43 @@ export function Dashboard() {
     }
   }, [range])
 
+  // Minimal WebSocket Integration for Real-Time Threat Updates
+  useEffect(() => {
+    // In a production app, retrieve the actual JWT from auth context/storage
+    const token = localStorage.getItem('auth_token') || 'demo_token'
+    const wsUrl = `ws://localhost:5000/api/v1/ws/threats?token=${token}`
+    
+    let ws: WebSocket | null = null
+    try {
+      ws = new WebSocket(wsUrl)
+      
+      ws.onopen = () => {
+        console.log('WebSocket connected for real-time updates')
+      }
+      
+      ws.onmessage = (event) => {
+        try {
+          const payload = JSON.parse(event.data)
+          console.log('Real-time update received:', payload.event_type)
+          // Trigger a refresh of the REST APIs when an event occurs
+          refetch()
+        } catch (err) {
+          console.error('Error parsing WS message', err)
+        }
+      }
+      
+      ws.onclose = () => {
+        console.log('WebSocket disconnected')
+      }
+    } catch (err) {
+      console.warn('WebSocket connection failed:', err)
+    }
+    
+    return () => {
+      if (ws) ws.close()
+    }
+  }, [refetch])
+
   const summary = useMemo(() => (alerts ? computeSummary(alerts) : null), [alerts])
   const distribution = useMemo(() => (alerts ? severityDistribution(alerts) : []), [alerts])
   const recentAlerts = useMemo(

@@ -151,6 +151,15 @@ uvicorn app.main:app --reload --port 5000
 
 ---
 
+## 9. Real-Time WebSockets
+
+- `WS /api/v1/ws/threats?token={jwt_token}`: Real-time broadcast channel for threat updates.
+  - Requires JWT authentication and valid RBAC role (ADMIN, ANALYST, COMMANDER, VIEWER).
+  - Pushes structured JSON events (`alert.created`, `threat.created`, `investigation.updated`, `intelligence.matched`).
+  - **Limitation**: The current `ConnectionManager` is in-memory and suitable for single-process deployments (MVP/Hackathon). Multiple workers require a Redis Pub/Sub backplane.
+
+---
+
 ## 9. Running Tests
 
 Execute the automated pytest test suite:

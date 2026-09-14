@@ -186,6 +186,9 @@ class CorrelationEngine:
                     components.append(component)
 
         # Create or update Threat groups for components
+        new_threats = []
+        updated_threats = []
+        
         for comp in components:
             comp_alerts = [alert_map[aid] for aid in comp if aid in alert_map]
             existing_threat_ids = {a.related_threat_id for a in comp_alerts if a.related_threat_id}
@@ -266,6 +269,7 @@ class CorrelationEngine:
                     mitre_techniques=list(mitre_set),
                 )
                 db.add(threat)
+                new_threats.append(threat)
             else:
                 threat.alert_count = len(comp_alerts)
                 threat.affected_assets = list(assets)[:10]
@@ -277,10 +281,18 @@ class CorrelationEngine:
                 threat.alert_ids = [a.id for a in comp_alerts]
                 threat.mitre_techniques = list(mitre_set)
                 threat.severity = threat_sev
+                updated_threats.append(threat)
 
             # Update alerts with this threat ID
             for a in comp_alerts:
                 a.related_threat_id = threat.id
 
         await db.commit()
+        
+        from app.services.websocket_manager import ws_manager
+        for t in new_threats:
+            await ws_manager.broadcast_threat_event("threat.created", t)
+        for t in updated_threats:
+            await ws_manager.broadcast_threat_event("threat.updated", t)
+            
         return new_correlations_count

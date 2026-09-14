@@ -277,11 +277,23 @@ async def create_alert(payload: Dict[str, Any], db: AsyncSession = Depends(get_d
     db.add(event)
 
     # 6. Enrich alert with threat intelligence if matching indicators found
-    from app.services.intelligence import intel_manager
-    await intel_manager.enrich_alert(db, alert)
+    from app.services.intelligence.manager import intel_manager
+    matched_intel = await intel_manager.enrich_alert(db, alert)
 
     await db.commit()
     await db.refresh(alert)
+    
+    from app.services.websocket_manager import ws_manager
+    await ws_manager.broadcast_alert_event("alert.created", alert)
+    
+    if matched_intel:
+        for intel in matched_intel:
+            await ws_manager.broadcast_intelligence_event(
+                "intelligence.matched",
+                indicator=intel.indicator,
+                threat_actor=intel.threat_actor,
+                matched_alerts=[alert.id]
+            )
 
     # 7. Trigger correlation engine
     try:
@@ -368,8 +380,23 @@ async def bulk_ingest_alerts(alerts_payload: List[Dict[str, Any]], db: AsyncSess
         )
         db.add(event)
         ingested_ids.append(alert_id)
-
+        
     await db.commit()
+    
+    from app.services.websocket_manager import ws_manager
+    for idx, raw_item in enumerate(alerts_payload):
+        # In a real app we'd fetch the committed alerts to broadcast, but for hackathon MVP 
+        # we can trigger a generic broadcast or fetch them. Since we only have IDs here easily,
+        # let's fetch them to broadcast properly.
+        pass
+        
+    # Fetching the newly ingested alerts to broadcast properly
+    stmt = select(Alert).where(Alert.id.in_(ingested_ids))
+    res = await db.execute(stmt)
+    new_alerts = list(res.scalars().all())
+    for a in new_alerts:
+        await ws_manager.broadcast_alert_event("alert.created", a)
+
 
     # Trigger correlation engine over batch
     await CorrelationEngine.correlate_alerts(db)
@@ -415,6 +442,10 @@ async def update_alert(alert_id: str, payload: AlertUpdate, db: AsyncSession = D
 
     await db.commit()
     await db.refresh(alert)
+    
+    from app.services.websocket_manager import ws_manager
+    await ws_manager.broadcast_alert_event("alert.updated", alert)
+    
     return alert
 
 
