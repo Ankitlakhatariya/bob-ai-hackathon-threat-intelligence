@@ -18,43 +18,12 @@ import {
   XAxis,
   YAxis,
 } from 'recharts'
-import type { AlertStatus, Severity, TrendPoint, TrendRange } from '../types/alert'
+import type { AlertStatus, TrendPoint, TrendRange } from '../types/alert'
 import type { Incident, IncidentStatus } from '../types/incident'
 import { computeSummary, severityDistribution } from '../lib/alertStats'
+import { chartColors, incidentStatusColors, severityColors, statusColors } from '../lib/chartTheme'
 import { fetchIncidents, fetchTrend } from '../services/mockApi'
 import { useAlerts } from '../hooks/useAlerts'
-
-const chartColors = {
-  accent: '#22d3ee',
-  low: '#3b82f6',
-  grid: '#283447',
-  tick: '#94a3b4',
-  critical: '#ef4444',
-  high: '#f97316',
-  medium: '#eab308',
-  safe: '#22c55e',
-  muted: '#64748b',
-}
-
-const severityColors: Record<Severity, string> = {
-  critical: chartColors.critical,
-  high: chartColors.high,
-  medium: chartColors.medium,
-  low: chartColors.low,
-}
-
-const statusColors: Record<AlertStatus, string> = {
-  open: chartColors.low,
-  investigating: chartColors.medium,
-  resolved: chartColors.safe,
-  'false-positive': chartColors.muted,
-}
-
-const incidentStatusColors: Record<IncidentStatus, string> = {
-  active: chartColors.critical,
-  investigating: chartColors.medium,
-  resolved: chartColors.safe,
-}
 
 const statusLabels: Record<AlertStatus, string> = {
   open: 'Open',

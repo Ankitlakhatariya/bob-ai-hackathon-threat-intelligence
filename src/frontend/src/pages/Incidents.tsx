@@ -6,6 +6,7 @@ import type { Incident, IncidentStatus } from '../types/incident'
 import { incidentExplanations } from '../data/mockAlerts'
 import { useAlerts } from '../hooks/useAlerts'
 import { fetchIncidents } from '../services/mockApi'
+import { severityColors } from '../lib/chartTheme'
 import { SeverityBadge } from '../components/severity/SeverityBadge'
 
 type StatusFilter = 'all' | IncidentStatus
@@ -24,13 +25,6 @@ const incidentStatusLabels: Record<IncidentStatus, string> = {
   active: 'Active',
   investigating: 'Investigating',
   resolved: 'Resolved',
-}
-
-const severityFill: Record<Severity, string> = {
-  critical: '#ef4444',
-  high: '#f97316',
-  medium: '#eab308',
-  low: '#3b82f6',
 }
 
 function formatDate(iso: string) {
@@ -419,7 +413,7 @@ function RelationshipDiagram({
               stroke="var(--border)"
               strokeWidth="1.5"
             />
-            <circle cx={alertX} cy="92" r="10" fill={severityFill[alert.severity]} opacity="0.85" />
+            <circle cx={alertX} cy="92" r="10" fill={severityColors[alert.severity]} opacity="0.85" />
             <text x={alertX} y="118" textAnchor="middle" fontSize="9" fill="var(--foreground-muted)">
               {alert.id}
             </text>

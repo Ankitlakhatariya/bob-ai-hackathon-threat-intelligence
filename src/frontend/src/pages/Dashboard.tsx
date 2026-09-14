@@ -15,33 +15,17 @@ import {
 } from 'recharts'
 import type { SystemStatus, TrendPoint, TrendRange } from '../types/alert'
 import { computeSummary, severityDistribution } from '../lib/alertStats'
+import { chartColors, severityColors } from '../lib/chartTheme'
 import { fetchTrend } from '../services/mockApi'
 import { useAlerts } from '../hooks/useAlerts'
 import { SeverityBadge } from '../components/severity/SeverityBadge'
 import { StatusBadge } from '../components/status/StatusBadge'
-
-const chartColors = {
-  accent: '#22d3ee',
-  low: '#3b82f6',
-  grid: '#283447',
-  tick: '#94a3b4',
-  critical: '#ef4444',
-  high: '#f97316',
-  medium: '#eab308',
-}
 
 const trendOptions: { value: TrendRange; label: string }[] = [
   { value: '24h', label: 'Last 24h' },
   { value: '7d', label: 'Last 7 days' },
   { value: '30d', label: 'Last 30 days' },
 ]
-
-const severityColors: Record<string, string> = {
-  Critical: chartColors.critical,
-  High: chartColors.high,
-  Medium: chartColors.medium,
-  Low: chartColors.low,
-}
 
 const healthColors = {
   healthy: 'var(--safe)',
@@ -414,7 +398,14 @@ function StatCard({
 }
 
 function RiskScore({ score }: { score: number }) {
-  const tone = score >= 80 ? chartColors.critical : score >= 60 ? chartColors.high : score >= 40 ? 'var(--medium)' : 'var(--low)'
+  const tone =
+    score >= 80
+      ? severityColors.critical
+      : score >= 60
+        ? severityColors.high
+        : score >= 40
+          ? severityColors.medium
+          : severityColors.low
   return (
     <span className="inline-flex items-center gap-2">
       <span className="h-1.5 w-12 overflow-hidden rounded-full bg-surface-2">
