@@ -69,6 +69,10 @@ html.light {
     color: var(--foreground);
   }
 
+  html {
+    scroll-behavior: smooth;
+  }
+
   ::selection {
     background-color: var(--primary);
     color: var(--primary-foreground);
@@ -81,6 +85,10 @@ html.light {
   }
 
   @media (prefers-reduced-motion: reduce) {
+    html {
+      scroll-behavior: auto;
+    }
+
     *,
     *::before,
     *::after {
