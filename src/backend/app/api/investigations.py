@@ -4,7 +4,8 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
-from app.core.dependencies import get_db
+from app.core.dependencies import get_db, require_permission, get_current_user
+from app.core.permissions import Permission
 from app.models.investigation import Investigation, InvestigationStatus, InvestigationPriority
 from app.models.audit_log import AuditLog
 from app.schemas.investigation import (
@@ -55,7 +56,12 @@ async def get_investigation(investigation_id: UUID, db: AsyncSession = Depends(g
     return case
 
 
-@router.post("", response_model=InvestigationRead, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "",
+    response_model=InvestigationRead,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_permission(Permission.INVESTIGATIONS_WRITE))],
+)
 async def create_investigation(payload: InvestigationCreate, db: AsyncSession = Depends(get_db)):
     case = Investigation(
         title=payload.title,
@@ -71,7 +77,6 @@ async def create_investigation(payload: InvestigationCreate, db: AsyncSession = 
     await db.commit()
     await db.refresh(case)
 
-    # Log audit trail
     log = AuditLog(
         action="INVESTIGATION_CREATED",
         entity_type="investigation",
@@ -84,7 +89,11 @@ async def create_investigation(payload: InvestigationCreate, db: AsyncSession = 
     return case
 
 
-@router.patch("/{investigation_id}", response_model=InvestigationRead)
+@router.patch(
+    "/{investigation_id}",
+    response_model=InvestigationRead,
+    dependencies=[Depends(require_permission(Permission.INVESTIGATIONS_WRITE))],
+)
 async def update_investigation(
     investigation_id: UUID,
     payload: InvestigationUpdate,
@@ -117,7 +126,11 @@ async def update_investigation(
     return case
 
 
-@router.post("/{investigation_id}/notes", response_model=InvestigationRead)
+@router.post(
+    "/{investigation_id}/notes",
+    response_model=InvestigationRead,
+    dependencies=[Depends(require_permission(Permission.INVESTIGATIONS_WRITE))],
+)
 async def add_investigation_note(
     investigation_id: UUID,
     payload: InvestigationNoteCreate,
@@ -139,7 +152,11 @@ async def add_investigation_note(
     return case
 
 
-@router.post("/{investigation_id}/resolve", response_model=InvestigationRead)
+@router.post(
+    "/{investigation_id}/resolve",
+    response_model=InvestigationRead,
+    dependencies=[Depends(require_permission(Permission.INVESTIGATIONS_WRITE))],
+)
 async def resolve_investigation(
     investigation_id: UUID,
     resolution_note: Optional[str] = Query("Threat mitigated and affected assets isolated."),
@@ -167,7 +184,11 @@ async def resolve_investigation(
     return case
 
 
-@router.post("/{investigation_id}/false-positive", response_model=InvestigationRead)
+@router.post(
+    "/{investigation_id}/false-positive",
+    response_model=InvestigationRead,
+    dependencies=[Depends(require_permission(Permission.INVESTIGATIONS_WRITE))],
+)
 async def mark_investigation_false_positive(
     investigation_id: UUID,
     reason: Optional[str] = Query("Activity verified as benign authorized administrative task."),
@@ -195,7 +216,11 @@ async def mark_investigation_false_positive(
     return case
 
 
-@router.post("/{investigation_id}/escalate", response_model=InvestigationRead)
+@router.post(
+    "/{investigation_id}/escalate",
+    response_model=InvestigationRead,
+    dependencies=[Depends(require_permission(Permission.INVESTIGATIONS_WRITE))],
+)
 async def escalate_investigation(
     investigation_id: UUID,
     escalate_to: str = Query("P1", regex="^(P1|P2|P3|P4)$"),

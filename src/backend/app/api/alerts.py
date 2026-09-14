@@ -3,7 +3,8 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, or_, func
-from app.core.dependencies import get_db
+from app.core.dependencies import get_db, require_permission, get_current_user
+from app.core.permissions import Permission
 from app.models.alert import Alert, AlertSeverity, AlertStatus, AlertSource
 from app.schemas.alert import (
     AlertRead,
@@ -76,7 +77,6 @@ async def get_alert_trend(
     db: AsyncSession = Depends(get_db),
 ):
     """Returns trend volume of alerts and correlated incidents over time (24h, 7d, 30d)."""
-    # Deterministic trend points matching frontend chart expectations
     trend_presets = {
         "24h": [
             TrendPointResponse(label="00:00", alerts=42, incidents=3),
@@ -117,11 +117,15 @@ async def get_alert(alert_id: str, db: AsyncSession = Depends(get_db)):
     return alert
 
 
-@router.post("", response_model=AlertRead, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "",
+    response_model=AlertRead,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_permission(Permission.ALERTS_WRITE))],
+)
 async def create_alert(payload: AlertCreate, db: AsyncSession = Depends(get_db)):
-    """Ingests a new normalized security alert."""
+    """Ingests a new normalized security alert. Requires ALERTS_WRITE permission."""
     if not payload.id:
-        # Generate ID like ALERT-XXXX
         count_res = await db.execute(select(func.count(Alert.id)))
         total = count_res.scalar() or 0
         payload.id = f"ALERT-{2000 + total + 1}"
@@ -135,7 +139,6 @@ async def create_alert(payload: AlertCreate, db: AsyncSession = Depends(get_db))
         }
         payload.source_label = source_labels.get(payload.source, payload.source.value.upper())
 
-    # Calculate deterministic risk score if default
     risk = payload.risk_score or ThreatScoringEngine.calculate_alert_risk(
         severity=payload.severity,
         indicators_count=len(payload.indicators),
@@ -164,7 +167,6 @@ async def create_alert(payload: AlertCreate, db: AsyncSession = Depends(get_db))
     await db.commit()
     await db.refresh(alert)
 
-    # Run correlation asynchronously
     try:
         await CorrelationEngine.correlate_alerts(db)
         await db.commit()
@@ -174,9 +176,14 @@ async def create_alert(payload: AlertCreate, db: AsyncSession = Depends(get_db))
     return alert
 
 
-@router.post("/bulk", response_model=AlertBulkIngestResponse, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/bulk",
+    response_model=AlertBulkIngestResponse,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_permission(Permission.ALERTS_WRITE))],
+)
 async def bulk_ingest_alerts(alerts_payload: List[AlertCreate], db: AsyncSession = Depends(get_db)):
-    """Bulk ingestion endpoint for high-volume SIEM/EDR pipelines."""
+    """Bulk ingestion endpoint for high-volume SIEM/EDR pipelines. Requires ALERTS_WRITE permission."""
     ingested_ids = []
     count_res = await db.execute(select(func.count(Alert.id)))
     base_num = 2000 + (count_res.scalar() or 0)
@@ -211,7 +218,6 @@ async def bulk_ingest_alerts(alerts_payload: List[AlertCreate], db: AsyncSession
 
     await db.commit()
 
-    # Trigger deterministic correlation engine
     await CorrelationEngine.correlate_alerts(db)
     await db.commit()
 
@@ -222,9 +228,13 @@ async def bulk_ingest_alerts(alerts_payload: List[AlertCreate], db: AsyncSession
     )
 
 
-@router.patch("/{alert_id}", response_model=AlertRead)
+@router.patch(
+    "/{alert_id}",
+    response_model=AlertRead,
+    dependencies=[Depends(require_permission(Permission.ALERTS_WRITE))],
+)
 async def update_alert(alert_id: str, payload: AlertUpdate, db: AsyncSession = Depends(get_db)):
-    """Updates alert status (e.g. open -> investigating / false-positive) or metadata."""
+    """Updates alert status or metadata. Requires ALERTS_WRITE permission."""
     alert = await db.get(Alert, alert_id)
     if not alert:
         raise HTTPException(

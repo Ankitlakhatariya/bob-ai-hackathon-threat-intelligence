@@ -3,7 +3,8 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
-from app.core.dependencies import get_db
+from app.core.dependencies import get_db, require_permission, get_current_user
+from app.core.permissions import Permission
 from app.models.data_source import DataSource, DataSourceStatus
 from app.schemas.data_source import DataSourceRead, DataSourceCreate, DataSourceUpdate
 
@@ -17,7 +18,12 @@ async def get_data_sources(db: AsyncSession = Depends(get_db)):
     return list(res.scalars().all())
 
 
-@router.post("", response_model=DataSourceRead, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "",
+    response_model=DataSourceRead,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_permission(Permission.DATA_SOURCES_MANAGE))],
+)
 async def create_data_source(payload: DataSourceCreate, db: AsyncSession = Depends(get_db)):
     existing = await db.get(DataSource, payload.id)
     if existing:
@@ -41,7 +47,11 @@ async def create_data_source(payload: DataSourceCreate, db: AsyncSession = Depen
     return ds
 
 
-@router.patch("/{data_source_id}", response_model=DataSourceRead)
+@router.patch(
+    "/{data_source_id}",
+    response_model=DataSourceRead,
+    dependencies=[Depends(require_permission(Permission.DATA_SOURCES_MANAGE))],
+)
 async def update_data_source(data_source_id: str, payload: DataSourceUpdate, db: AsyncSession = Depends(get_db)):
     ds = await db.get(DataSource, data_source_id)
     if not ds:
@@ -65,7 +75,11 @@ async def update_data_source(data_source_id: str, payload: DataSourceUpdate, db:
     return ds
 
 
-@router.delete("/{data_source_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete(
+    "/{data_source_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=[Depends(require_permission(Permission.DATA_SOURCES_MANAGE))],
+)
 async def delete_data_source(data_source_id: str, db: AsyncSession = Depends(get_db)):
     ds = await db.get(DataSource, data_source_id)
     if not ds:

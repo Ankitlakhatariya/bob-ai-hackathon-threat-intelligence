@@ -1,68 +1,235 @@
-from typing import Optional, Dict, Any
+from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
-from app.core.dependencies import get_db, get_current_user_claims
-from app.models.user import User, UserRole
-from app.schemas.auth import UserProfile, AuthResponse
+from app.core.dependencies import get_db, get_current_user
+from app.models.user import User
+from app.core.permissions import UserRole, get_permissions_for_role
+from app.core.security import (
+    verify_password,
+    get_password_hash,
+    create_access_token,
+    create_refresh_token,
+    decode_token,
+)
+from app.schemas.auth import (
+    UserRegisterRequest,
+    UserLoginRequest,
+    TokenResponse,
+    RefreshTokenRequest,
+    UserProfile,
+    AuthResponse,
+)
+from app.models.audit_log import AuditLog
 from app.core.logging import logger
 
 router = APIRouter()
 
 
-@router.get("/me", response_model=AuthResponse)
-async def get_current_user_profile(
-    claims: Optional[Dict[str, Any]] = Depends(get_current_user_claims),
-    db: AsyncSession = Depends(get_db),
-):
-    """Identifies the Supabase user from JWT, synchronizes the database profile, and returns role/profile info."""
-    if not claims:
-        # Graceful demo fallback if token is not provided
-        return AuthResponse(
-            user=UserProfile(
-                supabase_id="demo-analyst-id",
-                email="demo-analyst@threatlens.soc",
-                full_name="Demo SOC Analyst",
-                role=UserRole.ANALYST,
-                is_active=True,
-            ),
-            role="ANALYST",
-            token_type="Bearer"
-        )
+@router.post("/register", response_model=TokenResponse, status_code=status.HTTP_201_CREATED)
+async def register(payload: UserRegisterRequest, db: AsyncSession = Depends(get_db)):
+    """Registers a new user with secure password hashing and returns JWT tokens."""
+    stmt = select(User).where(User.email == payload.email)
+    res = await db.execute(stmt)
+    existing = res.scalars().first()
 
-    supabase_id = claims.get("sub") or claims.get("id")
-    email = claims.get("email") or f"{supabase_id}@auth.supabase.co"
-
-    if not supabase_id:
+    if existing:
         raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail={"error": {"code": "INVALID_CLAIMS", "message": "JWT does not contain user subject"}}
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={"error": {"code": "EMAIL_TAKEN", "message": "A user with this email address already exists"}},
         )
 
-    stmt = select(User).where(User.supabase_id == supabase_id)
+    user = User(
+        email=payload.email,
+        hashed_password=get_password_hash(payload.password),
+        full_name=payload.full_name or payload.email.split("@")[0],
+        role=payload.role,
+        is_active=True,
+    )
+    db.add(user)
+    await db.commit()
+    await db.refresh(user)
+
+    # Log registration in audit log
+    audit = AuditLog(
+        user_id=str(user.id),
+        action="USER_REGISTERED",
+        entity_type="user",
+        entity_id=str(user.id),
+        details={"email": user.email, "role": user.role.value},
+    )
+    db.add(audit)
+    await db.commit()
+
+    access_token = create_access_token(
+        subject=str(user.id),
+        role=user.role,
+        email=user.email,
+    )
+    refresh_token = create_refresh_token(subject=str(user.id))
+
+    permissions_list = [p.value for p in get_permissions_for_role(user.role)]
+    profile = UserProfile(
+        id=user.id,
+        supabase_id=user.supabase_id,
+        email=user.email,
+        full_name=user.full_name,
+        role=user.role,
+        permissions=permissions_list,
+        is_active=user.is_active,
+        created_at=user.created_at,
+    )
+
+    return TokenResponse(
+        access_token=access_token,
+        refresh_token=refresh_token,
+        token_type="Bearer",
+        expires_in=86400,
+        user=profile,
+    )
+
+
+@router.post("/login", response_model=TokenResponse)
+async def login(payload: UserLoginRequest, db: AsyncSession = Depends(get_db)):
+    """Authenticates with email and password, issuing access and refresh tokens."""
+    stmt = select(User).where(User.email == payload.email)
     res = await db.execute(stmt)
     user = res.scalars().first()
 
-    app_metadata = claims.get("app_metadata", {})
-    user_metadata = claims.get("user_metadata", {})
-    claim_roles = app_metadata.get("roles", ["ANALYST"])
-    role_str = claim_roles[0] if isinstance(claim_roles, list) and claim_roles else "ANALYST"
-    role_enum = getattr(UserRole, role_str.upper(), UserRole.ANALYST)
-
-    if not user:
-        user = User(
-            supabase_id=supabase_id,
-            email=email,
-            full_name=user_metadata.get("full_name") or user_metadata.get("name") or email.split("@")[0],
-            role=role_enum,
-            is_active=True,
+    if not user or not user.hashed_password or not verify_password(payload.password, user.hashed_password):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail={"error": {"code": "INVALID_CREDENTIALS", "message": "Incorrect email or password"}},
         )
-        db.add(user)
-        await db.commit()
-        await db.refresh(user)
+
+    if not user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={"error": {"code": "INACTIVE_USER", "message": "User account is suspended"}},
+        )
+
+    # Audit login
+    audit = AuditLog(
+        user_id=str(user.id),
+        action="USER_LOGIN",
+        entity_type="user",
+        entity_id=str(user.id),
+        details={"email": user.email},
+    )
+    db.add(audit)
+    await db.commit()
+
+    access_token = create_access_token(
+        subject=str(user.id),
+        role=user.role,
+        email=user.email,
+    )
+    refresh_token = create_refresh_token(subject=str(user.id))
+
+    permissions_list = [p.value for p in get_permissions_for_role(user.role)]
+    profile = UserProfile(
+        id=user.id,
+        supabase_id=user.supabase_id,
+        email=user.email,
+        full_name=user.full_name,
+        role=user.role,
+        permissions=permissions_list,
+        is_active=user.is_active,
+        created_at=user.created_at,
+    )
+
+    return TokenResponse(
+        access_token=access_token,
+        refresh_token=refresh_token,
+        token_type="Bearer",
+        expires_in=86400,
+        user=profile,
+    )
+
+
+@router.post("/refresh", response_model=TokenResponse)
+async def refresh_token_endpoint(payload: RefreshTokenRequest, db: AsyncSession = Depends(get_db)):
+    """Exchanges a valid refresh token for a new access and refresh token pair."""
+    token_claims = decode_token(payload.refresh_token)
+    if token_claims.get("type") != "refresh":
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail={"error": {"code": "INVALID_TOKEN", "message": "Provided token is not a refresh token"}},
+        )
+
+    user_id = token_claims.get("sub")
+    stmt = select(User).where(User.id == user_id)
+    res = await db.execute(stmt)
+    user = res.scalars().first()
+
+    if not user or not user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail={"error": {"code": "USER_NOT_FOUND", "message": "User no longer active"}},
+        )
+
+    new_access_token = create_access_token(
+        subject=str(user.id),
+        role=user.role,
+        email=user.email,
+    )
+    new_refresh_token = create_refresh_token(subject=str(user.id))
+
+    permissions_list = [p.value for p in get_permissions_for_role(user.role)]
+    profile = UserProfile(
+        id=user.id,
+        supabase_id=user.supabase_id,
+        email=user.email,
+        full_name=user.full_name,
+        role=user.role,
+        permissions=permissions_list,
+        is_active=user.is_active,
+        created_at=user.created_at,
+    )
+
+    return TokenResponse(
+        access_token=new_access_token,
+        refresh_token=new_refresh_token,
+        token_type="Bearer",
+        expires_in=86400,
+        user=profile,
+    )
+
+
+@router.post("/logout", status_code=status.HTTP_200_OK)
+async def logout(current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    """Logs out the current user session and records the event in audit logs."""
+    audit = AuditLog(
+        user_id=str(current_user.id),
+        action="USER_LOGOUT",
+        entity_type="user",
+        entity_id=str(current_user.id),
+        details={"email": current_user.email},
+    )
+    db.add(audit)
+    await db.commit()
+    return {"status": "success", "message": "Logged out successfully"}
+
+
+@router.get("/me", response_model=AuthResponse)
+async def get_current_user_profile(
+    current_user: User = Depends(get_current_user),
+):
+    """Returns the authenticated user's profile, role, and authorized permissions."""
+    permissions_list = [p.value for p in get_permissions_for_role(current_user.role)]
+    profile = UserProfile(
+        id=current_user.id,
+        supabase_id=current_user.supabase_id,
+        email=current_user.email,
+        full_name=current_user.full_name,
+        role=current_user.role,
+        permissions=permissions_list,
+        is_active=current_user.is_active,
+        created_at=current_user.created_at,
+    )
 
     return AuthResponse(
-        user=UserProfile.model_validate(user),
-        role=user.role.value,
-        token_type="Bearer"
+        user=profile,
+        role=current_user.role.value,
+        token_type="Bearer",
     )

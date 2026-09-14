@@ -3,10 +3,11 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, or_
-from app.core.dependencies import get_db
+from app.core.dependencies import get_db, require_permission, get_current_user
+from app.core.permissions import Permission
 from app.models.threat import Threat, ThreatSeverity, ThreatStatus
 from app.models.alert import Alert
-from app.models.mitre import MitreTechnique, ThreatMitreMapping
+from app.models.mitre import MitreTechnique
 from app.schemas.threat import ThreatRead, ThreatCreate, ThreatUpdate, ThreatTimelineEvent
 from app.schemas.alert import AlertRead
 from app.schemas.correlation import CorrelationResult
@@ -57,7 +58,6 @@ async def get_threats(
     res = await db.execute(stmt)
     threats = list(res.scalars().all())
 
-    # Map the custom updated_at_field to updated_at for serialization
     for t in threats:
         if not hasattr(t, "updated_at") or t.updated_at is None:
             t.updated_at = getattr(t, "updated_at_field", t.opened_at)
@@ -113,7 +113,6 @@ async def get_threat_timeline(threat_id: str, db: AsyncSession = Depends(get_db)
         ThreatTimelineEvent(time=threat.opened_at, label="Incident opened — alerts began correlating", tone="primary")
     ]
 
-    # Add alert timestamps
     alerts_stmt = select(Alert).where(Alert.related_threat_id == threat_id).order_by(Alert.timestamp.asc())
     alerts_res = await db.execute(alerts_stmt)
     for a in alerts_res.scalars().all():
@@ -170,9 +169,13 @@ async def get_threat_risk_breakdown(threat_id: str, db: AsyncSession = Depends(g
     }
 
 
-@router.post("/correlate", response_model=CorrelationResult)
+@router.post(
+    "/correlate",
+    response_model=CorrelationResult,
+    dependencies=[Depends(require_permission(Permission.CORRELATION_RUN))],
+)
 async def trigger_correlation(db: AsyncSession = Depends(get_db)):
-    """Triggers the deterministic correlation engine over all alerts."""
+    """Triggers the deterministic correlation engine over all alerts. Requires CORRELATION_RUN permission."""
     correlations_found = await CorrelationEngine.correlate_alerts(db)
     await db.commit()
 
