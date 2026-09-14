@@ -10,8 +10,8 @@
 |---|---|
 | **Team Name** | threat-intelligence |
 | **Track** | AI |
-| **Team Lead** | Ayush5112006 — thummarayush05@gmail.com |
-| **Members** | Ayush5112006 |
+| **Team Lead** | sutariyadhruv20-|
+| **Members** | Ayush5112006 — thummarayush05@gmail.com |
 
 ---
 
