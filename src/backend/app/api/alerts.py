@@ -1,11 +1,12 @@
-from typing import List, Optional
+from typing import List, Optional, Any, Dict
 from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, or_, func
+from sqlalchemy import select, or_, and_, func, desc, asc
 from app.core.dependencies import get_db, require_permission, get_current_user
 from app.core.permissions import Permission
 from app.models.alert import Alert, AlertSeverity, AlertStatus, AlertSource
+from app.models.event import Event
 from app.schemas.alert import (
     AlertRead,
     AlertCreate,
@@ -15,6 +16,7 @@ from app.schemas.alert import (
 )
 from app.services.threat_scoring import ThreatScoringEngine
 from app.services.correlation import CorrelationEngine
+from app.services.ingestion import AlertIngestionEngine
 from app.core.logging import logger
 
 router = APIRouter()
@@ -25,35 +27,72 @@ async def get_alerts(
     severity: Optional[str] = Query(None, description="critical, high, medium, low"),
     status: Optional[str] = Query(None, description="open, investigating, resolved, false-positive"),
     source: Optional[str] = Query(None, description="siem, edr, network-sensor, threat-feed"),
-    search: Optional[str] = Query(None, description="Search ID, title, or source"),
+    event_type: Optional[str] = Query(None, description="Filter by event_type (e.g. process_execution)"),
+    hostname: Optional[str] = Query(None, description="Filter by affected host/machine"),
+    username: Optional[str] = Query(None, description="Filter by user account"),
+    ip: Optional[str] = Query(None, description="Filter by source or destination IP"),
+    start_date: Optional[datetime] = Query(None, description="Filter alerts after timestamp"),
+    end_date: Optional[datetime] = Query(None, description="Filter alerts before timestamp"),
+    search: Optional[str] = Query(None, description="Free text search on ID, title, description, host, IP"),
+    sort_by: str = Query("timestamp", regex="^(timestamp|risk_score|severity|id)$"),
+    sort_order: str = Query("desc", regex="^(desc|asc)$"),
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=500),
     db: AsyncSession = Depends(get_db),
 ):
-    """Retrieve alerts with optional filtering and pagination."""
-    stmt = select(Alert).order_by(Alert.timestamp.desc())
+    """Retrieve security alerts with advanced multi-field filtering, sorting, and pagination."""
+    stmt = select(Alert)
 
-    if severity and severity != "all":
+    # 1. Severity filter
+    if severity and severity.lower() != "all":
         try:
-            sev_enum = AlertSeverity(severity.lower())
-            stmt = stmt.where(Alert.severity == sev_enum)
+            stmt = stmt.where(Alert.severity == AlertSeverity(severity.lower()))
         except ValueError:
             pass
 
-    if status and status != "all":
+    # 2. Status filter
+    if status and status.lower() != "all":
         try:
-            stat_enum = AlertStatus(status.lower())
-            stmt = stmt.where(Alert.status == stat_enum)
+            stmt = stmt.where(Alert.status == AlertStatus(status.lower()))
         except ValueError:
             pass
 
-    if source and source != "all":
+    # 3. Source filter
+    if source and source.lower() != "all":
         try:
-            src_enum = AlertSource(source.lower())
-            stmt = stmt.where(Alert.source == src_enum)
+            stmt = stmt.where(Alert.source == AlertSource(source.lower()))
         except ValueError:
             pass
 
+    # 4. Event Type filter
+    if event_type and event_type.lower() != "all":
+        stmt = stmt.where(Alert.event_type == event_type)
+
+    # 5. Hostname filter
+    if hostname:
+        stmt = stmt.where(Alert.hostname.ilike(f"%{hostname}%"))
+
+    # 6. Username filter
+    if username:
+        stmt = stmt.where(Alert.username.ilike(f"%{username}%"))
+
+    # 7. IP filter (checks both source and destination IP or indicators)
+    if ip:
+        stmt = stmt.where(
+            or_(
+                Alert.source_ip == ip,
+                Alert.destination_ip == ip,
+                Alert.indicators.any(ip),
+            )
+        )
+
+    # 8. Date Range filter
+    if start_date:
+        stmt = stmt.where(Alert.timestamp >= start_date)
+    if end_date:
+        stmt = stmt.where(Alert.timestamp <= end_date)
+
+    # 9. Free-text search
     if search:
         search_pattern = f"%{search}%"
         stmt = stmt.where(
@@ -62,8 +101,19 @@ async def get_alerts(
                 Alert.title.ilike(search_pattern),
                 Alert.source_label.ilike(search_pattern),
                 Alert.description.ilike(search_pattern),
+                Alert.hostname.ilike(search_pattern),
+                Alert.username.ilike(search_pattern),
+                Alert.source_ip.ilike(search_pattern),
+                Alert.destination_ip.ilike(search_pattern),
             )
         )
+
+    # 10. Sorting
+    sort_column = getattr(Alert, sort_by, Alert.timestamp)
+    if sort_order.lower() == "asc":
+        stmt = stmt.order_by(asc(sort_column))
+    else:
+        stmt = stmt.order_by(desc(sort_column))
 
     stmt = stmt.offset(skip).limit(limit)
     res = await db.execute(stmt)
@@ -107,7 +157,7 @@ async def get_alert_trend(
 
 @router.get("/{alert_id}", response_model=AlertRead)
 async def get_alert(alert_id: str, db: AsyncSession = Depends(get_db)):
-    """Retrieve single alert by ID."""
+    """Retrieve single alert with raw telemetry evidence and indicators."""
     alert = await db.get(Alert, alert_id)
     if not alert:
         raise HTTPException(
@@ -123,55 +173,88 @@ async def get_alert(alert_id: str, db: AsyncSession = Depends(get_db)):
     status_code=status.HTTP_201_CREATED,
     dependencies=[Depends(require_permission(Permission.ALERTS_WRITE))],
 )
-async def create_alert(payload: AlertCreate, db: AsyncSession = Depends(get_db)):
-    """Ingests a new normalized security alert. Requires ALERTS_WRITE permission."""
-    if not payload.id:
+async def create_alert(payload: Dict[str, Any], db: AsyncSession = Depends(get_db)):
+    """Ingests, normalizes, scores, and stores a security event from any telemetry source without data loss."""
+    # 1. Dispatch through AlertIngestionEngine for multi-source normalization
+    norm = AlertIngestionEngine.normalize_event(payload)
+
+    # 2. Determine or generate unique Alert ID
+    alert_id = norm.event_id or payload.get("id")
+    if not alert_id or not alert_id.startswith("ALERT-"):
         count_res = await db.execute(select(func.count(Alert.id)))
         total = count_res.scalar() or 0
-        payload.id = f"ALERT-{2000 + total + 1}"
+        alert_id = f"ALERT-{2000 + total + 1}"
 
-    if not payload.source_label:
-        source_labels = {
-            AlertSource.SIEM: "SIEM",
-            AlertSource.EDR: "EDR Endpoint Agent",
-            AlertSource.NETWORK_SENSOR: "Network Sensor",
-            AlertSource.THREAT_FEED: "Threat Intel Feed",
-        }
-        payload.source_label = source_labels.get(payload.source, payload.source.value.upper())
-
-    risk = payload.risk_score or ThreatScoringEngine.calculate_alert_risk(
-        severity=payload.severity,
-        indicators_count=len(payload.indicators),
-        mitre_count=len(payload.mitre_techniques),
-        is_correlated=bool(payload.related_incident_id),
+    # 3. Calculate deterministic risk score
+    risk = payload.get("risk_score") or payload.get("riskScore") or ThreatScoringEngine.calculate_alert_risk(
+        severity=norm.severity,
+        indicators_count=len(norm.indicators),
+        mitre_count=len(norm.mitre_techniques),
+        is_correlated=bool(payload.get("related_incident_id")),
     )
 
+    # 4. Create primary Alert entity
     alert = Alert(
-        id=payload.id,
-        team_id=payload.team_id,
-        title=payload.title,
-        description=payload.description,
-        source=payload.source,
-        source_label=payload.source_label,
-        timestamp=payload.timestamp or datetime.now(timezone.utc),
-        severity=payload.severity,
-        status=payload.status,
+        id=alert_id,
+        team_id=payload.get("team_id") or payload.get("teamId") or "t-soc-north",
+        title=norm.title,
+        description=norm.description,
+        source=norm.source,
+        source_label=norm.source_label,
+        timestamp=norm.timestamp,
+        severity=norm.severity,
+        status=AlertStatus.OPEN,
         risk_score=risk,
-        related_threat_id=payload.related_incident_id,
-        mitre_techniques=payload.mitre_techniques,
-        indicators=payload.indicators,
-        raw_data=payload.raw_data,
+        related_threat_id=payload.get("related_incident_id") or payload.get("relatedIncidentId"),
+        mitre_techniques=norm.mitre_techniques,
+        indicators=norm.indicators,
+        event_type=norm.event_type,
+        source_ip=norm.source_ip,
+        destination_ip=norm.destination_ip,
+        hostname=norm.hostname,
+        username=norm.username,
+        metadata_info=norm.metadata,
+        raw_data=payload,  # Preserves 100% of the raw vendor event
     )
-
     db.add(alert)
+
+    # 5. Create detailed underlying Event entity linked to alert
+    event = Event(
+        alert_id=alert_id,
+        event_id=norm.event_id or alert_id,
+        source=norm.source.value,
+        source_type=norm.source_type,
+        timestamp=norm.timestamp,
+        event_type=norm.event_type,
+        severity=norm.severity.value,
+        source_ip=norm.source_ip,
+        destination_ip=norm.destination_ip,
+        source_port=norm.source_port,
+        destination_port=norm.destination_port,
+        protocol=norm.protocol,
+        hostname=norm.hostname,
+        username=norm.username,
+        domain=norm.domain,
+        file_hash=norm.file_hash,
+        process_name=norm.process_name,
+        command_line=norm.command_line,
+        url=norm.url,
+        description=norm.description,
+        indicators=norm.indicators,
+        metadata_info=norm.metadata,
+        raw_data=payload,
+    )
+    db.add(event)
+
     await db.commit()
     await db.refresh(alert)
 
+    # 6. Trigger correlation engine
     try:
         await CorrelationEngine.correlate_alerts(db)
         await db.commit()
     except Exception as e:
-        logger.warning(f"Correlation pass skipped: {e}")
+        logger.warning(f"Correlation pass notice: {e}")
 
     return alert
 
@@ -182,42 +265,79 @@ async def create_alert(payload: AlertCreate, db: AsyncSession = Depends(get_db))
     status_code=status.HTTP_201_CREATED,
     dependencies=[Depends(require_permission(Permission.ALERTS_WRITE))],
 )
-async def bulk_ingest_alerts(alerts_payload: List[AlertCreate], db: AsyncSession = Depends(get_db)):
-    """Bulk ingestion endpoint for high-volume SIEM/EDR pipelines. Requires ALERTS_WRITE permission."""
+async def bulk_ingest_alerts(alerts_payload: List[Dict[str, Any]], db: AsyncSession = Depends(get_db)):
+    """High-throughput bulk ingestion pipeline for SIEM, EDR, and network feeds."""
     ingested_ids = []
     count_res = await db.execute(select(func.count(Alert.id)))
     base_num = 2000 + (count_res.scalar() or 0)
 
-    for idx, item in enumerate(alerts_payload):
-        alert_id = item.id or f"ALERT-{base_num + idx + 1}"
-        source_label = item.source_label or item.source.value.upper()
-        risk = item.risk_score or ThreatScoringEngine.calculate_alert_risk(
-            severity=item.severity,
-            indicators_count=len(item.indicators),
-            mitre_count=len(item.mitre_techniques),
+    for idx, raw_item in enumerate(alerts_payload):
+        norm = AlertIngestionEngine.normalize_event(raw_item)
+        alert_id = norm.event_id or raw_item.get("id")
+        if not alert_id or not alert_id.startswith("ALERT-"):
+            alert_id = f"ALERT-{base_num + idx + 1}"
+
+        risk = raw_item.get("risk_score") or raw_item.get("riskScore") or ThreatScoringEngine.calculate_alert_risk(
+            severity=norm.severity,
+            indicators_count=len(norm.indicators),
+            mitre_count=len(norm.mitre_techniques),
         )
 
         alert = Alert(
             id=alert_id,
-            team_id=item.team_id,
-            title=item.title,
-            description=item.description,
-            source=item.source,
-            source_label=source_label,
-            timestamp=item.timestamp or datetime.now(timezone.utc),
-            severity=item.severity,
-            status=item.status,
+            team_id=raw_item.get("team_id") or raw_item.get("teamId") or "t-soc-north",
+            title=norm.title,
+            description=norm.description,
+            source=norm.source,
+            source_label=norm.source_label,
+            timestamp=norm.timestamp,
+            severity=norm.severity,
+            status=AlertStatus.OPEN,
             risk_score=risk,
-            related_threat_id=item.related_incident_id,
-            mitre_techniques=item.mitre_techniques,
-            indicators=item.indicators,
-            raw_data=item.raw_data,
+            related_threat_id=raw_item.get("related_incident_id") or raw_item.get("relatedIncidentId"),
+            mitre_techniques=norm.mitre_techniques,
+            indicators=norm.indicators,
+            event_type=norm.event_type,
+            source_ip=norm.source_ip,
+            destination_ip=norm.destination_ip,
+            hostname=norm.hostname,
+            username=norm.username,
+            metadata_info=norm.metadata,
+            raw_data=raw_item,
         )
         db.add(alert)
+
+        event = Event(
+            alert_id=alert_id,
+            event_id=norm.event_id or alert_id,
+            source=norm.source.value,
+            source_type=norm.source_type,
+            timestamp=norm.timestamp,
+            event_type=norm.event_type,
+            severity=norm.severity.value,
+            source_ip=norm.source_ip,
+            destination_ip=norm.destination_ip,
+            source_port=norm.source_port,
+            destination_port=norm.destination_port,
+            protocol=norm.protocol,
+            hostname=norm.hostname,
+            username=norm.username,
+            domain=norm.domain,
+            file_hash=norm.file_hash,
+            process_name=norm.process_name,
+            command_line=norm.command_line,
+            url=norm.url,
+            description=norm.description,
+            indicators=norm.indicators,
+            metadata_info=norm.metadata,
+            raw_data=raw_item,
+        )
+        db.add(event)
         ingested_ids.append(alert_id)
 
     await db.commit()
 
+    # Trigger correlation engine over batch
     await CorrelationEngine.correlate_alerts(db)
     await db.commit()
 
@@ -234,7 +354,7 @@ async def bulk_ingest_alerts(alerts_payload: List[AlertCreate], db: AsyncSession
     dependencies=[Depends(require_permission(Permission.ALERTS_WRITE))],
 )
 async def update_alert(alert_id: str, payload: AlertUpdate, db: AsyncSession = Depends(get_db)):
-    """Updates alert status or metadata. Requires ALERTS_WRITE permission."""
+    """Updates alert status or attributes. Requires ALERTS_WRITE permission."""
     alert = await db.get(Alert, alert_id)
     if not alert:
         raise HTTPException(
@@ -262,3 +382,21 @@ async def update_alert(alert_id: str, payload: AlertUpdate, db: AsyncSession = D
     await db.commit()
     await db.refresh(alert)
     return alert
+
+
+@router.delete(
+    "/{alert_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=[Depends(require_permission(Permission.ALERTS_WRITE))],
+)
+async def delete_alert(alert_id: str, db: AsyncSession = Depends(get_db)):
+    """Deletes an alert and associated telemetry events."""
+    alert = await db.get(Alert, alert_id)
+    if not alert:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={"error": {"code": "ALERT_NOT_FOUND", "message": f"Alert {alert_id} not found"}},
+        )
+    await db.delete(alert)
+    await db.commit()
+    return None

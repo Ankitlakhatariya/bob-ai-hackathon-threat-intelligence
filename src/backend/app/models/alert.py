@@ -29,11 +29,11 @@ class AlertSource(str, Enum):
 
 
 class Alert(Base, TimestampMixin):
-    """Core Alert entity matching frontend Alert interface."""
+    """Core Alert entity matching frontend Alert interface with enriched telemetry fields."""
     __tablename__ = "alerts"
 
     id: Mapped[str] = mapped_column(String(64), primary_key=True)  # e.g. ALERT-2041
-    team_id: Mapped[str] = mapped_column(String(64), default="default-team", nullable=False, index=True)
+    team_id: Mapped[str] = mapped_column(String(64), default="t-soc-north", nullable=False, index=True)
     title: Mapped[str] = mapped_column(String(255), nullable=False)
     description: Mapped[str] = mapped_column(Text, nullable=False)
     source: Mapped[AlertSource] = mapped_column(
@@ -70,6 +70,14 @@ class Alert(Base, TimestampMixin):
     indicators: Mapped[List[str]] = mapped_column(ARRAY(String), default=list, nullable=False)
     raw_data: Mapped[Optional[Any]] = mapped_column(JSONB, nullable=True)
 
+    # Ingestion telemetry & normalized fields for fast indexed filtering
+    event_type: Mapped[Optional[str]] = mapped_column(String(128), nullable=True, index=True)
+    source_ip: Mapped[Optional[str]] = mapped_column(String(45), nullable=True, index=True)
+    destination_ip: Mapped[Optional[str]] = mapped_column(String(45), nullable=True, index=True)
+    hostname: Mapped[Optional[str]] = mapped_column(String(255), nullable=True, index=True)
+    username: Mapped[Optional[str]] = mapped_column(String(255), nullable=True, index=True)
+    metadata_info: Mapped[Optional[Any]] = mapped_column(JSONB, nullable=True)
+
     # Relationships
     threat = relationship("Threat", back_populates="alerts", foreign_keys=[related_threat_id])
     events = relationship("Event", back_populates="alert", cascade="all, delete-orphan")
@@ -78,3 +86,5 @@ class Alert(Base, TimestampMixin):
 Index("idx_alerts_status_severity", Alert.status, Alert.severity)
 Index("idx_alerts_source_timestamp", Alert.source, Alert.timestamp)
 Index("idx_alerts_risk_score", Alert.risk_score.desc())
+Index("idx_alerts_ip_lookup", Alert.source_ip, Alert.destination_ip)
+Index("idx_alerts_host_user", Alert.hostname, Alert.username)

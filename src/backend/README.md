@@ -12,22 +12,41 @@ ThreatLens is a specialized threat correlation and alert prioritization engine f
 
 ---
 
-## 2. Architecture & Security
+## 2. Multi-Source Alert Ingestion Subsystem
 
-```
-Frontend (React + Vite + TypeScript)
-               ↓ HTTP (Bearer JWT)
-FastAPI Backend (/api/v1 + /api compatibility)
-   ├── Routers (Auth, Alerts, Threats, Dashboard, MITRE, BLUF, Intelligence, Investigations)
-   ├── RBAC Layer (Admin, Analyst, Commander, Viewer role-based permissions)
-   ├── Services (CorrelationEngine, ThreatScoringEngine, ThreatIntelService, MitreService, BlufService)
-   ├── Pydantic v2 Schemas (Automatic camelCase serialization matching frontend types)
-   └── SQLAlchemy 2.x ORM
-               ↓ asyncpg / async engine
-Supabase PostgreSQL (Tables, Indexes, Foreign Keys)
-               ↑ JWT Verification
-Supabase Auth (Bearer Token)
-```
+The ingestion engine accepts security events from heterogeneous telemetry sources without losing raw vendor evidence:
+
+- **SIEM** (IBM QRadar, Splunk, Elastic, ArcSight)
+- **EDR** (CrowdStrike Falcon, Microsoft Defender, Carbon Black)
+- **Perimeter Firewalls** (Palo Alto Networks, Fortinet, pfSense)
+- **Network Sensors & NIDS** (Zeek, Suricata, Snort)
+- **Threat Intelligence Feeds** (MISP, AlienVault OTX, VirusTotal)
+- **Cyber Sensors & Incident Reports**
+
+### Common Normalized Internal Structure
+Every event is transformed into a common model while preserving 100% of the raw vendor event in `raw_data`:
+
+| Field | Description |
+|---|---|
+| `event_id` | Vendor event identifier |
+| `source` | Normalized source enum (`siem`, `edr`, `network-sensor`, `threat-feed`) |
+| `source_label` | Human-readable source label (e.g. `EDR Endpoint Agent`, `Firewall Sensor`) |
+| `source_type` | Telemetry type (`SIEM`, `EDR`, `Firewall`, `Network Sensor`) |
+| `timestamp` | UTC normalized timestamp |
+| `event_type` | Categorized event type (e.g. `process_execution`, `security_rule_match`) |
+| `severity` | Normalized enum (`critical`, `high`, `medium`, `low`) |
+| `source_ip` / `destination_ip` | Network endpoints (Indexed) |
+| `source_port` / `destination_port` | Transport ports |
+| `protocol` | IP protocol (TCP, UDP, ICMP) |
+| `hostname` | Affected host/workstation (Indexed) |
+| `username` | User account (Indexed) |
+| `domain` | Active Directory or DNS domain |
+| `file_hash` | MD5 or SHA256 executable hash |
+| `process_name` / `command_line` | Process details and command arguments |
+| `url` | Web destination |
+| `indicators` | Automatically extracted IOCs (IPs, domains, hashes) |
+| `metadata` | Preserved metadata parameters |
+| `raw_data` | Complete original JSON payload for audit and forensic inspection |
 
 ---
 
@@ -78,7 +97,7 @@ copy .env.example .env
 
 ### Step 4: Run Database Migrations
 
-Apply the database schema and authentication tables to Supabase PostgreSQL:
+Apply the database schema, ingestion indexes, and authentication tables to Supabase PostgreSQL:
 
 ```powershell
 alembic upgrade head
@@ -95,17 +114,32 @@ uvicorn app.main:app --reload --port 5000
 
 ---
 
-## 5. Authentication Endpoints
+## 5. Alert Ingestion & Filtering API
 
-- `POST /api/v1/auth/register`: Register user with secure password hashing (`email`, `password`, `full_name`, `role`).
-- `POST /api/v1/auth/login`: Authenticate and receive `access_token` and `refresh_token`.
-- `POST /api/v1/auth/refresh`: Exchange refresh token for new access and refresh token pair.
-- `POST /api/v1/auth/logout`: End session and log audit event.
-- `GET /api/v1/auth/me`: Returns the authenticated user's profile, role, and active permissions array.
+### Ingestion Endpoints
+- `POST /api/v1/alerts`: Ingest single security alert from any source (auto-normalizes, scores, extracts IOCs, and preserves `raw_data`).
+- `POST /api/v1/alerts/bulk`: High-throughput ingestion of heterogeneous event batches.
+- `PATCH /api/v1/alerts/{id}`: Update alert status, severity, or risk score.
+- `DELETE /api/v1/alerts/{id}`: Delete alert and cascade associated telemetry events.
+
+### Advanced Filtering Parameters (`GET /api/v1/alerts`)
+- `?severity=critical|high|medium|low`
+- `?source=siem|edr|network-sensor|threat-feed`
+- `?status=open|investigating|resolved|false-positive`
+- `?event_type=process_execution|security_rule_match`
+- `?hostname=FINANCE-WS01`
+- `?username=alice.smith`
+- `?ip=198.51.100.50` (matches either source or destination IP)
+- `?start_date=2026-09-01T00:00:00Z&end_date=2026-09-14T23:59:59Z`
+- `?search=mimikatz` (free-text across IDs, hosts, IPs, descriptions)
+- `?sort_by=risk_score&sort_order=desc` (supports `timestamp`, `risk_score`, `severity`, `id`)
+- `?skip=0&limit=50` (pagination)
 
 ---
 
 ## 6. Running Tests
+
+Execute the automated pytest test suite:
 
 ```powershell
 pytest -v
