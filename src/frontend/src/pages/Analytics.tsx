@@ -14,6 +14,7 @@ import {
   BarChart,
   CartesianGrid,
   Cell,
+  ResponsiveContainer,
   Tooltip,
   XAxis,
   YAxis,
@@ -236,55 +237,59 @@ export function Analytics() {
                 </div>
               }
             >
-              {trend ? (
-                <AreaChart data={trend} margin={{ top: 4, right: 4, bottom: 0, left: -18 }}>
-                  <defs>
-                    <linearGradient id="gradAnalyticsAlerts" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor={chartColors.accent} stopOpacity={0.35} />
-                      <stop offset="100%" stopColor={chartColors.accent} stopOpacity={0} />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid stroke={chartColors.grid} strokeDasharray="3 3" vertical={false} />
-                  <XAxis
-                    dataKey="label"
-                    tick={{ fill: chartColors.tick, fontSize: 11 }}
-                    axisLine={{ stroke: chartColors.grid }}
-                    tickLine={false}
-                  />
-                  <YAxis
-                    tick={{ fill: chartColors.tick, fontSize: 11 }}
-                    axisLine={false}
-                    tickLine={false}
-                  />
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: 'var(--surface-2)',
-                      border: '1px solid var(--border)',
-                      borderRadius: 8,
-                      color: 'var(--foreground)',
-                      fontSize: 12,
-                    }}
-                    labelStyle={{ color: 'var(--foreground-muted)' }}
-                  />
-                  <Area
-                    type="monotone"
-                    dataKey="alerts"
-                    name="Alerts"
-                    stroke={chartColors.accent}
-                    strokeWidth={2}
-                    fill="url(#gradAnalyticsAlerts)"
-                  />
-                  <Area
-                    type="monotone"
-                    dataKey="incidents"
-                    name="Incidents"
-                    stroke={chartColors.low}
-                    strokeWidth={2}
-                    fill="transparent"
-                  />
-                </AreaChart>
-              ) : (
+              {trend && trend.length > 0 ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={trend} margin={{ top: 4, right: 4, bottom: 0, left: -18 }}>
+                    <defs>
+                      <linearGradient id="gradAnalyticsAlerts" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor={chartColors.accent} stopOpacity={0.35} />
+                        <stop offset="100%" stopColor={chartColors.accent} stopOpacity={0} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid stroke={chartColors.grid} strokeDasharray="3 3" vertical={false} />
+                    <XAxis
+                      dataKey="label"
+                      tick={{ fill: chartColors.tick, fontSize: 11 }}
+                      axisLine={{ stroke: chartColors.grid }}
+                      tickLine={false}
+                    />
+                    <YAxis
+                      tick={{ fill: chartColors.tick, fontSize: 11 }}
+                      axisLine={false}
+                      tickLine={false}
+                    />
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: 'var(--surface-2)',
+                        border: '1px solid var(--border)',
+                        borderRadius: 8,
+                        color: 'var(--foreground)',
+                        fontSize: 12,
+                      }}
+                      labelStyle={{ color: 'var(--foreground-muted)' }}
+                    />
+                    <Area
+                      type="monotone"
+                      dataKey="alerts"
+                      name="Alerts"
+                      stroke={chartColors.accent}
+                      strokeWidth={2}
+                      fill="url(#gradAnalyticsAlerts)"
+                    />
+                    <Area
+                      type="monotone"
+                      dataKey="incidents"
+                      name="Incidents"
+                      stroke={chartColors.low}
+                      strokeWidth={2}
+                      fill="transparent"
+                    />
+                  </AreaChart>
+                </ResponsiveContainer>
+              ) : trend === null ? (
                 <ChartSkeleton />
+              ) : (
+                <ChartEmpty />
               )}
             </ChartCard>
 
@@ -294,32 +299,38 @@ export function Analytics() {
                 description="How many sample alerts fall into each severity band."
                 srSummary="Bar chart of sample alerts grouped by severity: critical, high, medium, and low."
               >
-                <BarChart data={severity.map((entry) => ({ label: entry.severity, count: entry.count }))} margin={{ top: 4, right: 4, bottom: 0, left: -18 }}>
-                  <CartesianGrid stroke={chartColors.grid} strokeDasharray="3 3" vertical={false} />
-                  <XAxis
-                    dataKey="label"
-                    tick={{ fill: chartColors.tick, fontSize: 11 }}
-                    axisLine={{ stroke: chartColors.grid }}
-                    tickLine={false}
-                  />
-                  <YAxis tick={{ fill: chartColors.tick, fontSize: 11 }} axisLine={false} tickLine={false} />
-                  <Tooltip
-                    cursor={{ fill: 'var(--surface-2)' }}
-                    contentStyle={{
-                      backgroundColor: 'var(--surface-2)',
-                      border: '1px solid var(--border)',
-                      borderRadius: 8,
-                      color: 'var(--foreground)',
-                      fontSize: 12,
-                    }}
-                    labelStyle={{ color: 'var(--foreground-muted)' }}
-                  />
-                  <Bar dataKey="count" name="Alerts" radius={[4, 4, 0, 0]}>
-                    {severity.map((entry) => (
-                      <Cell key={entry.severity} fill={severityColors[entry.severity]} />
-                    ))}
-                  </Bar>
-                </BarChart>
+                {severity.length > 0 ? (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={severity.map((entry) => ({ label: entry.severity, count: entry.count }))} margin={{ top: 4, right: 4, bottom: 0, left: -18 }}>
+                      <CartesianGrid stroke={chartColors.grid} strokeDasharray="3 3" vertical={false} />
+                      <XAxis
+                        dataKey="label"
+                        tick={{ fill: chartColors.tick, fontSize: 11 }}
+                        axisLine={{ stroke: chartColors.grid }}
+                        tickLine={false}
+                      />
+                      <YAxis tick={{ fill: chartColors.tick, fontSize: 11 }} axisLine={false} tickLine={false} />
+                      <Tooltip
+                        cursor={{ fill: 'var(--surface-2)' }}
+                        contentStyle={{
+                          backgroundColor: 'var(--surface-2)',
+                          border: '1px solid var(--border)',
+                          borderRadius: 8,
+                          color: 'var(--foreground)',
+                          fontSize: 12,
+                        }}
+                        labelStyle={{ color: 'var(--foreground-muted)' }}
+                      />
+                      <Bar dataKey="count" name="Alerts" radius={[4, 4, 0, 0]}>
+                        {severity.map((entry) => (
+                          <Cell key={entry.severity} fill={severityColors[entry.severity]} />
+                        ))}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <ChartEmpty />
+                )}
               </ChartCard>
 
               <ChartCard
@@ -327,32 +338,38 @@ export function Analytics() {
                 description="Which detection feeds produced the sample alerts."
                 srSummary="Bar chart of sample alerts grouped by detection source."
               >
-                <BarChart data={sourceDistribution.map((entry) => ({ label: entry.label, count: entry.count }))} margin={{ top: 4, right: 4, bottom: 0, left: -18 }}>
-                  <CartesianGrid stroke={chartColors.grid} strokeDasharray="3 3" vertical={false} />
-                  <XAxis
-                    dataKey="label"
-                    tick={{ fill: chartColors.tick, fontSize: 10 }}
-                    axisLine={{ stroke: chartColors.grid }}
-                    tickLine={false}
-                    interval={0}
-                    angle={-12}
-                    textAnchor="end"
-                    height={40}
-                  />
-                  <YAxis tick={{ fill: chartColors.tick, fontSize: 11 }} axisLine={false} tickLine={false} />
-                  <Tooltip
-                    cursor={{ fill: 'var(--surface-2)' }}
-                    contentStyle={{
-                      backgroundColor: 'var(--surface-2)',
-                      border: '1px solid var(--border)',
-                      borderRadius: 8,
-                      color: 'var(--foreground)',
-                      fontSize: 12,
-                    }}
-                    labelStyle={{ color: 'var(--foreground-muted)' }}
-                  />
-                  <Bar dataKey="count" name="Alerts" fill={chartColors.accent} radius={[4, 4, 0, 0]} />
-                </BarChart>
+                {sourceDistribution.length > 0 ? (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={sourceDistribution.map((entry) => ({ label: entry.label, count: entry.count }))} margin={{ top: 4, right: 4, bottom: 0, left: -18 }}>
+                      <CartesianGrid stroke={chartColors.grid} strokeDasharray="3 3" vertical={false} />
+                      <XAxis
+                        dataKey="label"
+                        tick={{ fill: chartColors.tick, fontSize: 10 }}
+                        axisLine={{ stroke: chartColors.grid }}
+                        tickLine={false}
+                        interval={0}
+                        angle={-12}
+                        textAnchor="end"
+                        height={40}
+                      />
+                      <YAxis tick={{ fill: chartColors.tick, fontSize: 11 }} axisLine={false} tickLine={false} />
+                      <Tooltip
+                        cursor={{ fill: 'var(--surface-2)' }}
+                        contentStyle={{
+                          backgroundColor: 'var(--surface-2)',
+                          border: '1px solid var(--border)',
+                          borderRadius: 8,
+                          color: 'var(--foreground)',
+                          fontSize: 12,
+                        }}
+                        labelStyle={{ color: 'var(--foreground-muted)' }}
+                      />
+                      <Bar dataKey="count" name="Alerts" fill={chartColors.accent} radius={[4, 4, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <ChartEmpty />
+                )}
               </ChartCard>
 
               <ChartCard
@@ -360,36 +377,42 @@ export function Analytics() {
                 description="Where the sample alerts sit today: open, investigating, resolved, or false positive."
                 srSummary="Bar chart showing investigation-state coverage across the sample alerts."
               >
-                <BarChart data={lifecycleDistribution.map((entry) => ({ label: statusLabels[entry.status], count: entry.count }))} margin={{ top: 4, right: 4, bottom: 0, left: -18 }}>
-                  <CartesianGrid stroke={chartColors.grid} strokeDasharray="3 3" vertical={false} />
-                  <XAxis
-                    dataKey="label"
-                    tick={{ fill: chartColors.tick, fontSize: 10 }}
-                    axisLine={{ stroke: chartColors.grid }}
-                    tickLine={false}
-                    interval={0}
-                    angle={-12}
-                    textAnchor="end"
-                    height={40}
-                  />
-                  <YAxis tick={{ fill: chartColors.tick, fontSize: 11 }} axisLine={false} tickLine={false} />
-                  <Tooltip
-                    cursor={{ fill: 'var(--surface-2)' }}
-                    contentStyle={{
-                      backgroundColor: 'var(--surface-2)',
-                      border: '1px solid var(--border)',
-                      borderRadius: 8,
-                      color: 'var(--foreground)',
-                      fontSize: 12,
-                    }}
-                    labelStyle={{ color: 'var(--foreground-muted)' }}
-                  />
-                  <Bar dataKey="count" name="Alerts" radius={[4, 4, 0, 0]}>
-                    {lifecycleDistribution.map((entry) => (
-                      <Cell key={entry.status} fill={statusColors[entry.status]} />
-                    ))}
-                  </Bar>
-                </BarChart>
+                {lifecycleDistribution.length > 0 ? (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={lifecycleDistribution.map((entry) => ({ label: statusLabels[entry.status], count: entry.count }))} margin={{ top: 4, right: 4, bottom: 0, left: -18 }}>
+                      <CartesianGrid stroke={chartColors.grid} strokeDasharray="3 3" vertical={false} />
+                      <XAxis
+                        dataKey="label"
+                        tick={{ fill: chartColors.tick, fontSize: 10 }}
+                        axisLine={{ stroke: chartColors.grid }}
+                        tickLine={false}
+                        interval={0}
+                        angle={-12}
+                        textAnchor="end"
+                        height={40}
+                      />
+                      <YAxis tick={{ fill: chartColors.tick, fontSize: 11 }} axisLine={false} tickLine={false} />
+                      <Tooltip
+                        cursor={{ fill: 'var(--surface-2)' }}
+                        contentStyle={{
+                          backgroundColor: 'var(--surface-2)',
+                          border: '1px solid var(--border)',
+                          borderRadius: 8,
+                          color: 'var(--foreground)',
+                          fontSize: 12,
+                        }}
+                        labelStyle={{ color: 'var(--foreground-muted)' }}
+                      />
+                      <Bar dataKey="count" name="Alerts" radius={[4, 4, 0, 0]}>
+                        {lifecycleDistribution.map((entry) => (
+                          <Cell key={entry.status} fill={statusColors[entry.status]} />
+                        ))}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <ChartEmpty />
+                )}
               </ChartCard>
 
               <ChartCard
@@ -397,32 +420,38 @@ export function Analytics() {
                 description="Correlated incidents by lifecycle — active campaigns need the most attention."
                 srSummary="Bar chart of correlated incidents grouped by status."
               >
-                <BarChart data={incidentStatusDistribution.map((entry) => ({ label: incidentStatusLabels[entry.status], count: entry.count }))} margin={{ top: 4, right: 4, bottom: 0, left: -18 }}>
-                  <CartesianGrid stroke={chartColors.grid} strokeDasharray="3 3" vertical={false} />
-                  <XAxis
-                    dataKey="label"
-                    tick={{ fill: chartColors.tick, fontSize: 11 }}
-                    axisLine={{ stroke: chartColors.grid }}
-                    tickLine={false}
-                  />
-                  <YAxis tick={{ fill: chartColors.tick, fontSize: 11 }} axisLine={false} tickLine={false} />
-                  <Tooltip
-                    cursor={{ fill: 'var(--surface-2)' }}
-                    contentStyle={{
-                      backgroundColor: 'var(--surface-2)',
-                      border: '1px solid var(--border)',
-                      borderRadius: 8,
-                      color: 'var(--foreground)',
-                      fontSize: 12,
-                    }}
-                    labelStyle={{ color: 'var(--foreground-muted)' }}
-                  />
-                  <Bar dataKey="count" name="Incidents" radius={[4, 4, 0, 0]}>
-                    {incidentStatusDistribution.map((entry) => (
-                      <Cell key={entry.status} fill={incidentStatusColors[entry.status]} />
-                    ))}
-                  </Bar>
-                </BarChart>
+                {incidentStatusDistribution.length > 0 ? (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={incidentStatusDistribution.map((entry) => ({ label: incidentStatusLabels[entry.status], count: entry.count }))} margin={{ top: 4, right: 4, bottom: 0, left: -18 }}>
+                      <CartesianGrid stroke={chartColors.grid} strokeDasharray="3 3" vertical={false} />
+                      <XAxis
+                        dataKey="label"
+                        tick={{ fill: chartColors.tick, fontSize: 11 }}
+                        axisLine={{ stroke: chartColors.grid }}
+                        tickLine={false}
+                      />
+                      <YAxis tick={{ fill: chartColors.tick, fontSize: 11 }} axisLine={false} tickLine={false} />
+                      <Tooltip
+                        cursor={{ fill: 'var(--surface-2)' }}
+                        contentStyle={{
+                          backgroundColor: 'var(--surface-2)',
+                          border: '1px solid var(--border)',
+                          borderRadius: 8,
+                          color: 'var(--foreground)',
+                          fontSize: 12,
+                        }}
+                        labelStyle={{ color: 'var(--foreground-muted)' }}
+                      />
+                      <Bar dataKey="count" name="Incidents" radius={[4, 4, 0, 0]}>
+                        {incidentStatusDistribution.map((entry) => (
+                          <Cell key={entry.status} fill={incidentStatusColors[entry.status]} />
+                        ))}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <ChartEmpty />
+                )}
               </ChartCard>
             </div>
           </div>
@@ -563,6 +592,14 @@ function ChartSkeleton() {
         />
       ))}
     </div>
+  )
+}
+
+function ChartEmpty() {
+  return (
+    <p className="flex h-full w-full items-center justify-center px-4 text-center text-xs text-foreground-muted">
+      No data available for this visualization.
+    </p>
   )
 }
 
