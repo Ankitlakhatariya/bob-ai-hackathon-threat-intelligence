@@ -1,6 +1,7 @@
 from typing import List, Optional
 from uuid import UUID
-from pydantic import BaseModel, ConfigDict
+from datetime import datetime
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class MitreTacticRead(BaseModel):
@@ -12,21 +13,26 @@ class MitreTacticRead(BaseModel):
 
 
 class MitreTechniqueRead(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
 
     id: str
     name: str
     tactics: List[str]
     description: str
     url: str
+    is_subtechnique: bool = Field(default=False, serialization_alias="isSubtechnique")
+    parent_technique_id: Optional[str] = Field(default=None, serialization_alias="parentTechniqueId")
 
 
-class ThreatMitreRead(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
+class ThreatMitreMappingRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
 
-    id: UUID
-    threat_id: str
-    technique_id: str
+    id: Optional[UUID] = None
+    threat_id: str = Field(serialization_alias="threatId")
+    technique_id: str = Field(serialization_alias="techniqueId")
+    technique_name: str = Field(serialization_alias="techniqueName")
+    tactic: str
     confidence: int
-    evidence: Optional[str] = None
-    technique: Optional[MitreTechniqueRead] = None
+    evidence: str
+    source: str
+    created_at: Optional[datetime] = Field(default=None, serialization_alias="createdAt")

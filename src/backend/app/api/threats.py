@@ -200,9 +200,11 @@ async def get_threat_timeline(threat_id: str, db: AsyncSession = Depends(get_db)
     return events
 
 
-@router.get("/{threat_id}/mitre", response_model=List[MitreTechniqueRead])
+@router.get("/{threat_id}/mitre", response_model=List[ThreatMitreMappingRead])
 async def get_threat_mitre_techniques(threat_id: str, db: AsyncSession = Depends(get_db)):
-    """Retrieves all MITRE ATT&CK techniques mapped to this threat."""
+    """Retrieves all MITRE ATT&CK techniques mapped to this threat, including explicit evidence that caused the mapping."""
+    from app.services.mitre_service import MitreService
+
     threat = await db.get(Threat, threat_id)
     if not threat:
         raise HTTPException(
@@ -210,12 +212,8 @@ async def get_threat_mitre_techniques(threat_id: str, db: AsyncSession = Depends
             detail={"error": {"code": "THREAT_NOT_FOUND", "message": f"Threat {threat_id} not found"}},
         )
 
-    if not threat.mitre_techniques:
-        return []
-
-    stmt = select(MitreTechnique).where(MitreTechnique.id.in_(threat.mitre_techniques))
-    res = await db.execute(stmt)
-    return list(res.scalars().all())
+    mappings = await MitreService.get_threat_mitre_mappings(db, threat_id)
+    return mappings
 
 
 @router.get("/{threat_id}/risk", response_model=ThreatRiskResponse)
