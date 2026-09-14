@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Activity, ChevronDown, ChevronUp, GitBranch, Network, Search } from 'lucide-react'
+import { Activity, ChevronDown, ChevronUp, GitBranch, Network, RotateCw, Search, ShieldAlert } from 'lucide-react'
 import type { Alert, Severity } from '../types/alert'
 import type { Incident, IncidentStatus } from '../types/incident'
 import { incidentExplanations } from '../data/mockAlerts'
@@ -45,6 +45,8 @@ function formatDate(iso: string) {
 export function Incidents() {
   const { alerts } = useAlerts()
   const [incidents, setIncidents] = useState<Incident[] | null>(null)
+  const [incidentError, setIncidentError] = useState(false)
+  const [incidentAttempt, setIncidentAttempt] = useState(0)
   const [search, setSearch] = useState('')
   const [status, setStatus] = useState<StatusFilter>('all')
   const [severity, setSeverity] = useState<SeverityFilter>('all')
@@ -52,13 +54,18 @@ export function Incidents() {
 
   useEffect(() => {
     let active = true
-    fetchIncidents().then((data) => {
-      if (active) setIncidents(data)
-    })
+    setIncidentError(false)
+    fetchIncidents()
+      .then((data) => {
+        if (active) setIncidents(data)
+      })
+      .catch(() => {
+        if (active) setIncidentError(true)
+      })
     return () => {
       active = false
     }
-  }, [])
+  }, [incidentAttempt])
 
   const filtered = useMemo(() => {
     if (!incidents) return []
@@ -127,11 +134,13 @@ export function Incidents() {
 
       <div className="mt-4 flex items-center justify-between">
         <p className="text-xs text-foreground-muted" aria-live="polite">
-          {incidents === null
-            ? 'Loading sample incidents…'
-            : filtered.length === 0
-              ? 'No incidents match the current filters.'
-              : `${filtered.length} correlated incident${filtered.length === 1 ? '' : 's'} · sample data`}
+          {incidentError
+            ? 'Sample incidents failed to load — retry before continuing.'
+            : incidents === null
+              ? 'Loading sample incidents…'
+              : filtered.length === 0
+                ? 'No incidents match the current filters.'
+                : `${filtered.length} correlated incident${filtered.length === 1 ? '' : 's'} · sample data`}
         </p>
         {haveActiveFilters && (
           <button
@@ -145,7 +154,28 @@ export function Incidents() {
       </div>
 
       <div className="mt-4 space-y-4">
-        {incidents === null ? (
+        {incidentError ? (
+          <div
+            role="alert"
+            className="flex flex-col items-start gap-3 rounded-xl border border-critical/40 bg-critical/10 p-6"
+          >
+            <div className="flex items-center gap-2 text-critical">
+              <ShieldAlert className="h-5 w-5" aria-hidden="true" />
+              <span className="text-sm font-semibold">Could not load demo incidents</span>
+            </div>
+            <p className="text-sm text-foreground-muted">
+              The sample correlation results failed to load (simulated failure).
+            </p>
+            <button
+              type="button"
+              onClick={() => setIncidentAttempt((current) => current + 1)}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-surface px-4 py-2 text-sm font-semibold text-foreground transition-colors hover:bg-surface-2"
+            >
+              <RotateCw className="h-4 w-4" aria-hidden="true" />
+              Retry
+            </button>
+          </div>
+        ) : incidents === null ? (
           <IncidentSkeleton />
         ) : filtered.length === 0 ? (
           <div className="flex flex-col items-center gap-3 rounded-xl border border-border bg-surface px-5 py-16 text-center">

@@ -317,7 +317,7 @@ export function Home() {
             </div>
             <div>
               <p className="text-xs font-semibold uppercase tracking-wider text-foreground-muted">
-                Planned modules
+                Modules
               </p>
               <ul className="mt-3 space-y-2 text-sm text-foreground-muted">
                 <li>Alert intelligence</li>
@@ -325,6 +325,7 @@ export function Home() {
                 <li>MITRE ATT&CK explorer</li>
                 <li>BLUF briefs</li>
                 <li>Analytics</li>
+                <li>Settings</li>
               </ul>
             </div>
           </div>
