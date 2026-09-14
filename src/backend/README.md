@@ -12,56 +12,63 @@ ThreatLens is a specialized threat correlation and alert prioritization engine f
 
 ---
 
-## 2. Threat Intelligence Subsystem
+## 2. Threat Correlation Engine
+
+The Threat Correlation Engine combines thousands of individual security alerts into meaningful, cohesive threat groups using deterministic, explainable rules without relying on non-deterministic LLMs for core correlation.
+
+### Correlation Dimensions & Evidence Factors
+- **Same Hostname** (+0.35)
+- **Same Username** (+0.30)
+- **Same Source IP** (+0.30)
+- **Same Destination IP** (+0.25)
+- **Shared Indicators** (IPs, domains, hashes) (+0.35)
+- **Shared MITRE ATT&CK Techniques** (+0.20)
+- **Temporal Proximity** (scaled based on minute/hour interval)
+- **Attack Kill-Chain Progression** (e.g. policy violation -> rule match -> process execution -> C2) (+0.15)
+- **Threat Intelligence Attribution Match** (shared threat actor / campaign) (+0.30)
+
+### Explainable Decision Guarantee
+Every correlation link stores an explainable reason and numerical confidence score:
+```json
+{
+  "correlationReason": "Same host 'srv-prod-app01' and Same user account 'deployer' | Observed within 8 minutes",
+  "correlationScore": 0.85,
+  "ruleName": "multi_attribute_correlation"
+}
+```
+
+### Threat Model Attributes
+- `threat_id`: Unique campaign identifier (`INC-1001` / `THREAT-1001`)
+- `title`: Primary threat title
+- `description` / `summary`: Consolidated incident narrative
+- `severity`: Elevated severity (`critical`, `high`, `medium`, `low`)
+- `risk_score`: Consolidated 0–100 risk score
+- `confidence`: Statistical confidence score based on corroborating data sources
+- `status`: Lifecycle state (`active`, `investigating`, `resolved`)
+- `first_seen` / `last_seen`: Timeline bounds
+- `alert_count`: Total member alerts
+- `affected_assets`: Unique hosts, users, and IPs involved
+
+---
+
+## 3. Threat Intelligence Subsystem
 
 The threat intelligence subsystem manages Indicators of Compromise (IOCs) and enriches alerts across the pipeline:
-
-### Supported Indicator Types
-- **IP addresses** (`198.51.100.23`)
-- **Domains** (`c2-beacon.darknet.org`)
-- **URLs** (`https://evil-site.com/payload.exe`)
-- **File Hashes** (MD5, SHA1, SHA256)
-- **Email addresses** (`phisher@malicious.com`)
-- **Malware & Tool identifiers** (`mimikatz.exe`, `Cobalt Strike`)
-
-### Indicator Attributes
-- `indicator`: Unique IOC string
-- `indicator_type`: `ip`, `domain`, `url`, `hash`, `email`, `malware`
-- `reputation`: `malicious`, `suspicious`, `benign`, `unknown`
-- `confidence`: Numerical score (0–100)
-- `source`: Attribution feed or analyst source
-- `first_seen` / `last_seen`: Temporal tracking
-- `tags`: Classification labels (`c2`, `ransomware`, `apt29`)
-- `threat_actor`: Attribution group (e.g. `APT28 / Fancy Bear`)
-- `campaign`: Named threat campaign (e.g. `Operation Ghostwriter`)
-- `raw_intelligence`: Complete JSON intelligence context
-
-### Pluggable Provider Abstraction
-Threat intelligence providers implement `AbstractThreatIntelProvider`:
-- Seamlessly replace or add third-party feeds (VirusTotal, AlienVault OTX, AbuseIPDB, MISP).
-- **Strict Anti-Fabrication Guarantee**: If an external provider is not configured or an indicator is unknown, the system strictly returns `reputation: "unknown"`, `found: false` rather than guessing or pretending an indicator is malicious.
-
-### Automated Alert Enrichment
-When an alert is ingested via `POST /api/v1/alerts` or `POST /bulk`, its indicators are automatically checked against the intelligence catalog. Alerts containing verified malicious IOCs receive:
-- **Risk Score Elevation** (+20 points)
-- **Automatic Severity Promotion** (Low/Medium escalated to High)
-- **Attached Intelligence Context** (`metadata_info["threat_intelligence"]`)
+- **IP addresses**, **Domains**, **URLs**, **File Hashes**, **Email addresses**, **Malware indicators**
+- Pluggable provider abstraction with anti-fabrication guarantees (returns `unknown` if unconfigured).
+- Automated alert enrichment elevating risk and attaching threat context.
 
 ---
 
-## 3. Multi-Source Alert Ingestion Subsystem
+## 4. Multi-Source Alert Ingestion Subsystem
 
 The ingestion engine accepts security events from heterogeneous telemetry sources without losing raw vendor evidence:
-- **SIEM** (QRadar, Splunk, Elastic, ArcSight)
-- **EDR** (CrowdStrike Falcon, Microsoft Defender, Carbon Black)
-- **Perimeter Firewalls** (Palo Alto Networks, Fortinet, pfSense)
-- **Network Sensors & NIDS** (Zeek, Suricata, Snort)
-- **Threat Intelligence Feeds** (MISP, AlienVault OTX, VirusTotal)
-- **Cyber Sensors & Incident Reports**
+- **SIEM**, **EDR**, **Firewalls**, **Network Sensors / NIDS**, **Threat Feeds**, **Cyber Reports**
+- 100% raw data preservation in `raw_data`.
 
 ---
 
-## 4. Role-Based Access Control (RBAC)
+## 5. Role-Based Access Control (RBAC)
 
 The platform enforces 4 distinct roles with granular permissions:
 
@@ -74,7 +81,7 @@ The platform enforces 4 distinct roles with granular permissions:
 
 ---
 
-## 5. Setup Commands
+## 6. Setup Commands
 
 ### Step 1: Create Virtual Environment
 
@@ -123,16 +130,18 @@ uvicorn app.main:app --reload --port 5000
 
 ---
 
-## 6. Threat Intelligence Endpoints
+## 7. Correlation & Threat Endpoints
 
-- `POST /api/v1/intelligence/indicators`: Ingest a verified IOC into the catalog.
-- `GET /api/v1/intelligence/indicators`: Query indicators with filtering (`type`, `reputation`, `threat_actor`, `campaign`, `search`).
-- `GET /api/v1/intelligence/indicators/{id}`: Detailed record with `raw_intelligence`.
-- `GET /api/v1/intelligence/lookup/{indicator}`: Fast IOC reputation lookup and cross-referencing against existing alerts.
+- `POST /api/v1/threats/correlate`: Executes deterministic correlation engine across all unassigned and open alerts.
+- `GET /api/v1/threats`: List correlated threat groups with pagination and sorting.
+- `GET /api/v1/threats/{id}`: Detailed threat campaign summary and confidence score.
+- `GET /api/v1/threats/{id}/alerts`: Retrieve member alerts in the threat.
+- `GET /api/v1/threats/{id}/timeline`: Chronological progression timeline.
+- `GET /api/v1/alerts/{id}/related`: Retrieve all correlated alerts with explainable reasons and scores.
 
 ---
 
-## 7. Running Tests
+## 8. Running Tests
 
 Execute the automated pytest test suite:
 

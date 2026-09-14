@@ -21,12 +21,14 @@ class ThreatSeverity(str, Enum):
 
 
 class Threat(Base, TimestampMixin):
-    """Represents a correlated incident / threat campaign."""
+    """Represents a correlated incident / threat campaign grouping related alerts."""
     __tablename__ = "threats"
 
-    id: Mapped[str] = mapped_column(String(64), primary_key=True)  # e.g. INC-1001
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)  # e.g. INC-1001 or THREAT-1001
+    threat_id: Mapped[Optional[str]] = mapped_column(String(64), index=True, nullable=True)
     title: Mapped[str] = mapped_column(String(255), nullable=False)
     summary: Mapped[str] = mapped_column(Text, nullable=False)
+    description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     explanation: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     severity: Mapped[ThreatSeverity] = mapped_column(
         SQLEnum(ThreatSeverity, name="threat_severity_enum", values_callable=lambda x: [e.value for e in x]),
@@ -40,14 +42,30 @@ class Threat(Base, TimestampMixin):
         nullable=False,
         index=True,
     )
+    risk_score: Mapped[int] = mapped_column(Integer, default=50, nullable=False, index=True)  # 0-100
     confidence: Mapped[int] = mapped_column(Integer, default=70, nullable=False)  # 0-100
+    alert_count: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
+    affected_assets: Mapped[List[str]] = mapped_column(ARRAY(String), default=list, nullable=False)
+    first_seen: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        nullable=False,
+        index=True,
+    )
+    last_seen: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        nullable=False,
+        index=True,
+    )
+
+    # Legacy fields preserved for frontend compatibility
     opened_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         default=lambda: datetime.now(timezone.utc),
         nullable=False,
     )
-    updated_at_field: Mapped[datetime] = mapped_column(
-        "updated_at_custom",
+    updated_at_custom: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         default=lambda: datetime.now(timezone.utc),
         onupdate=lambda: datetime.now(timezone.utc),
@@ -63,4 +81,5 @@ class Threat(Base, TimestampMixin):
 
 
 Index("idx_threats_status_severity", Threat.status, Threat.severity)
-Index("idx_threats_created_at", Threat.created_at)
+Index("idx_threats_timeline", Threat.first_seen, Threat.last_seen)
+Index("idx_threats_risk_score", Threat.risk_score.desc())

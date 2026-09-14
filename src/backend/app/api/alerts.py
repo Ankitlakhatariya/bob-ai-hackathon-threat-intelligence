@@ -167,6 +167,36 @@ async def get_alert(alert_id: str, db: AsyncSession = Depends(get_db)):
     return alert
 
 
+@router.get("/{alert_id}/related", response_model=List[Dict[str, Any]])
+async def get_related_alerts(alert_id: str, db: AsyncSession = Depends(get_db)):
+    """Returns all alerts correlated with this alert along with explainable reasons and scores."""
+    from app.models.correlation import Correlation
+
+    stmt = select(Correlation).where(
+        or_(Correlation.alert_id == alert_id, Correlation.related_alert_id == alert_id)
+    ).order_by(Correlation.correlation_score.desc())
+    res = await db.execute(stmt)
+    corrs = list(res.scalars().all())
+
+    result = []
+    for c in corrs:
+        other_id = c.related_alert_id if c.alert_id == alert_id else c.alert_id
+        other_alert = await db.get(Alert, other_id)
+        result.append(
+            {
+                "correlationId": str(c.id),
+                "alertId": alert_id,
+                "relatedAlertId": other_id,
+                "correlationReason": c.correlation_reason,
+                "correlationScore": c.correlation_score,
+                "ruleName": c.rule_name,
+                "createdAt": c.created_at,
+                "relatedAlert": AlertRead.model_validate(other_alert) if other_alert else None,
+            }
+        )
+    return result
+
+
 @router.post(
     "",
     response_model=AlertRead,
