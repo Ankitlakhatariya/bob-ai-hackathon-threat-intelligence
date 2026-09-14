@@ -82,8 +82,8 @@ demo/*.mov
 demo/*.avi
 demo/*.mkv
 
-# ── Docker volumes / local data ───────────────────────────────────────────────
-data/
+# ── Docker volumes / local data (repo root only) ──────────────────────────────
+/data/
 logs/
 *.log
 
