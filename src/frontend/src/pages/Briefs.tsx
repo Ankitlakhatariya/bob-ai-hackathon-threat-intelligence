@@ -3,9 +3,7 @@ import { Link } from 'react-router-dom'
 import { Activity, Check, ClipboardList, Copy, FileText, Printer, RotateCw, ShieldAlert } from 'lucide-react'
 import type { Severity } from '../types/alert'
 import type { Incident } from '../types/incident'
-import { mockBriefs } from '../data/mockBriefs'
-import { useAlerts } from '../hooks/useAlerts'
-import { fetchIncidents } from '../services/mockApi'
+import { getThreats, getBlufReports, getThreatAlerts } from '../services/apiClient'
 import { SeverityBadge } from '../components/severity/SeverityBadge'
 
 interface Priority {
@@ -32,17 +30,20 @@ function formatTime(iso: string) {
 }
 
 export function Briefs() {
-  const { alerts, error, refetch } = useAlerts()
-  const [incidents, setIncidents] = useState<Incident[] | null>(null)
+  const [incidents, setIncidents] = useState<any[] | null>(null)
+  const [briefs, setBriefs] = useState<Record<string, any> | null>(null)
   const [incidentError, setIncidentError] = useState(false)
   const [incidentAttempt, setIncidentAttempt] = useState(0)
 
   useEffect(() => {
     let active = true
     setIncidentError(false)
-    fetchIncidents()
-      .then((data) => {
-        if (active) setIncidents(data)
+    Promise.all([getThreats(), getBlufReports()])
+      .then(([threatsData, briefsData]) => {
+        if (active) {
+          setIncidents(threatsData)
+          setBriefs(briefsData)
+        }
       })
       .catch(() => {
         if (active) setIncidentError(true)
@@ -61,11 +62,10 @@ export function Briefs() {
     })
   }, [incidents])
 
-  const dataReady = alerts !== null && incidents !== null
-  const hasError = error !== null || incidentError
+  const dataReady = incidents !== null && briefs !== null
+  const hasError = incidentError
 
   function refetchAll() {
-    refetch()
     setIncidentAttempt((current) => current + 1)
   }
 
@@ -123,7 +123,7 @@ export function Briefs() {
       ) : (
         <div className="mt-6 space-y-6">
           {sorted.map((incident) => (
-            <BriefCard key={incident.id} incident={incident} />
+            <BriefCard key={incident.id} incident={incident} brief={briefs?.[incident.id]} />
           ))}
           <p className="text-center text-xs text-foreground-muted">
             All briefs are simulated demo content — no real security investigation was performed.
@@ -134,26 +134,26 @@ export function Briefs() {
   )
 }
 
-function BriefCard({ incident }: { incident: Incident }) {
-  const { alerts } = useAlerts()
-  const brief = mockBriefs[incident.id]
+function BriefCard({ incident, brief }: { incident: any; brief: any }) {
+  const [relatedAlerts, setRelatedAlerts] = useState<any[]>([])
   const [copied, setCopied] = useState(false)
-  const relatedAlerts = useMemo(
-    () =>
-      (alerts ?? [])
-        .filter((alert) => incident.alertIds.includes(alert.id))
-        .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()),
-    [alerts, incident.alertIds],
-  )
+
+  useEffect(() => {
+    let active = true
+    getThreatAlerts(incident.id).then((data) => {
+      if (active) setRelatedAlerts(data)
+    }).catch(() => {})
+    return () => { active = false }
+  }, [incident.id])
 
   const timeline = useMemo(() => {
     const events = [
-      { time: incident.openedAt, label: 'Incident opened' },
+      { time: incident.openedAt || incident.opened_at, label: 'Incident opened' },
       ...relatedAlerts.map((alert) => ({
         time: alert.timestamp,
         label: `Alert ${alert.id} correlated into the incident`,
       })),
-      { time: incident.updatedAt, label: 'Last correlation activity' },
+      { time: incident.updatedAt || incident.updated_at || incident.openedAt, label: 'Last correlation activity' },
     ]
     return events.sort((a, b) => new Date(a.time).getTime() - new Date(b.time).getTime())
   }, [incident, relatedAlerts])
@@ -169,13 +169,13 @@ function BriefCard({ incident }: { incident: Incident }) {
       `${incident.title}`,
       `Priority: ${priority.level} — ${priority.label}`,
       '',
-      `Bottom line: ${brief?.bottomLine ?? incident.summary}`,
+      `Bottom line: ${brief?.bottom_line || brief?.bottomLine || incident.summary}`,
       `Impact: ${brief?.impact ?? 'See incident summary (demo).'}`,
       '',
       'Key evidence:',
       ...evidence.map((item) => `- ${item}`),
       '',
-      `Recommended investigation focus: ${brief?.recommendedFocus ?? 'Open the incident view and review the related sample alerts.'}`,
+      `Recommended investigation focus: ${brief?.recommended_focus || brief?.recommendedFocus || 'Open the incident view and review the related sample alerts.'}`,
       `Related alerts: ${relatedAlerts.map((alert) => alert.id).join(', ') || 'none'}`,
       '',
       'Demo brief — simulated data. No real security investigation was performed.',
@@ -232,7 +232,7 @@ function BriefCard({ incident }: { incident: Incident }) {
           </p>
         </div>
         <h2 className="mt-2 text-lg font-semibold tracking-tight">{incident.title}</h2>
-        <p className="mt-2 text-sm font-medium leading-relaxed">{brief?.bottomLine ?? incident.summary}</p>
+        <p className="mt-2 text-sm font-medium leading-relaxed">{brief?.bottom_line || brief?.bottomLine || incident.summary}</p>
 
         <div className="mt-6 grid gap-5 lg:grid-cols-3">
           <section>
@@ -264,7 +264,7 @@ function BriefCard({ incident }: { incident: Incident }) {
               Recommended investigation focus
             </h3>
             <p className="mt-2 text-sm leading-relaxed text-foreground-muted">
-              {brief?.recommendedFocus ??
+              {brief?.recommended_focus || brief?.recommendedFocus ||
                 'Open the incident view and review the related sample alerts (demo guidance).'}
             </p>
 

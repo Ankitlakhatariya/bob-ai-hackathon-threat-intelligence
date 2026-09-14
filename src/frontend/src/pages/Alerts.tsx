@@ -34,50 +34,41 @@ function formatTimestamp(value: string) {
   })
 }
 
-export function Alerts() {
-  const { alerts, loading, error, refetch } = useAlerts()
+  const params: Record<string, string> = {
+    limit: String(PAGE_SIZE),
+    skip: String((page - 1) * PAGE_SIZE),
+  }
+  
+  if (search.trim()) params.search = search.trim()
+  if (severity !== 'all') params.severity = severity
+  if (source !== 'all') params.source = source
+  if (status !== 'all') params.status = status
+  
+  if (sortKey === 'newest') {
+    params.sort_by = 'timestamp'
+    params.sort_order = 'desc'
+  } else if (sortKey === 'oldest') {
+    params.sort_by = 'timestamp'
+    params.sort_order = 'asc'
+  } else if (sortKey === 'risk') {
+    params.sort_by = 'risk_score'
+    params.sort_order = 'desc'
+  } else if (sortKey === 'id') {
+    params.sort_by = 'id'
+    params.sort_order = 'asc'
+  }
 
-  const [search, setSearch] = useState('')
-  const [severity, setSeverity] = useState<SeverityFilter>('all')
-  const [source, setSource] = useState<SourceFilter>('all')
-  const [status, setStatus] = useState<StatusFilter>('all')
-  const [sortKey, setSortKey] = useState<SortKey>('newest')
-  const [page, setPage] = useState(1)
-
-  const filtered = useMemo(() => {
-    if (!alerts) return []
-    const query = search.trim().toLowerCase()
-    const matching = alerts.filter((alert) => {
-      if (severity !== 'all' && alert.severity !== severity) return false
-      if (source !== 'all' && alert.source !== source) return false
-      if (status !== 'all' && alert.status !== status) return false
-      if (query) {
-        const haystack = `${alert.id} ${alert.title} ${alert.sourceLabel}`.toLowerCase()
-        if (!haystack.includes(query)) return false
-      }
-      return true
-    })
-
-    return matching.sort((a, b) => {
-      switch (sortKey) {
-        case 'oldest':
-          return new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
-        case 'risk':
-          return b.riskScore - a.riskScore
-        case 'id':
-          return a.id.localeCompare(b.id)
-        case 'newest':
-        default:
-          return new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
-      }
-    })
-  }, [alerts, search, severity, source, status, sortKey])
-
-  const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
-  const currentPage = Math.min(page, pageCount)
-  const visible = filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)
-  const start = filtered.length === 0 ? 0 : (currentPage - 1) * PAGE_SIZE + 1
-  const end = Math.min(currentPage * PAGE_SIZE, filtered.length)
+  const { alerts, loading, error, refetch } = useAlerts(params)
+  
+  const visible = alerts || []
+  
+  // Note: Since backend doesn't return total count currently, we simulate pageCount 
+  // based on whether we received a full page of items.
+  const hasMore = visible.length === PAGE_SIZE
+  const pageCount = hasMore ? page + 1 : page
+  const currentPage = page
+  const start = visible.length === 0 ? 0 : (currentPage - 1) * PAGE_SIZE + 1
+  const end = (currentPage - 1) * PAGE_SIZE + visible.length
 
   function resetFilters() {
     setSearch('')
@@ -194,9 +185,9 @@ export function Alerts() {
         <section className="mt-6 rounded-xl border border-border bg-surface">
           <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border px-5 py-3">
             <p className="text-xs text-foreground-muted" aria-live="polite">
-              {filtered.length === 0
+              {visible.length === 0
                 ? 'No alerts match the current filters.'
-                : `Showing ${start}–${end} of ${filtered.length} alerts`}
+                : `Showing ${start}–${end} alerts`}
               <span className="ml-1.5 text-foreground-muted/70">· sample data</span>
             </p>
             {haveActiveFilters && (
@@ -277,13 +268,13 @@ export function Alerts() {
                       <td className="px-4 py-3">
                         <SeverityBadge severity={alert.severity} />
                       </td>
-                      <td className="px-4 py-3 font-mono text-foreground-muted">{alert.riskScore}</td>
+                      <td className="px-4 py-3 font-mono text-foreground-muted">{alert.risk_score || alert.riskScore}</td>
                       <td className="px-4 py-3">
                         <StatusBadge status={alert.status} />
                       </td>
                       <td className="px-4 py-3 text-foreground-muted">
-                        {alert.relatedIncidentId
-                          ? incidentTitles[alert.relatedIncidentId] ?? alert.relatedIncidentId
+                        {alert.related_threat_id || alert.relatedIncidentId
+                          ? incidentTitles[alert.related_threat_id || alert.relatedIncidentId] ?? (alert.related_threat_id || alert.relatedIncidentId)
                           : '—'}
                       </td>
                       <td className="px-4 py-3">

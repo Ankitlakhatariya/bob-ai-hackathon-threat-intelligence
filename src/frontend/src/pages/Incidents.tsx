@@ -4,8 +4,7 @@ import { Activity, ChevronDown, ChevronUp, GitBranch, Network, RotateCw, Search,
 import type { Alert, Severity } from '../types/alert'
 import type { Incident, IncidentStatus } from '../types/incident'
 import { incidentExplanations } from '../data/mockAlerts'
-import { useAlerts } from '../hooks/useAlerts'
-import { fetchIncidents } from '../services/mockApi'
+import { getThreats, getThreatAlerts } from '../services/apiClient'
 import { severityColors } from '../lib/chartTheme'
 import { SeverityBadge } from '../components/severity/SeverityBadge'
 
@@ -37,8 +36,7 @@ function formatDate(iso: string) {
 }
 
 export function Incidents() {
-  const { alerts } = useAlerts()
-  const [incidents, setIncidents] = useState<Incident[] | null>(null)
+  const [incidents, setIncidents] = useState<any[] | null>(null)
   const [incidentError, setIncidentError] = useState(false)
   const [incidentAttempt, setIncidentAttempt] = useState(0)
   const [search, setSearch] = useState('')
@@ -49,7 +47,13 @@ export function Incidents() {
   useEffect(() => {
     let active = true
     setIncidentError(false)
-    fetchIncidents()
+
+    const params: Record<string, string> = {}
+    if (search.trim()) params.search = search.trim()
+    if (status !== 'all') params.status = status
+    if (severity !== 'all') params.severity = severity
+
+    getThreats(params)
       .then((data) => {
         if (active) setIncidents(data)
       })
@@ -59,23 +63,7 @@ export function Incidents() {
     return () => {
       active = false
     }
-  }, [incidentAttempt])
-
-  const filtered = useMemo(() => {
-    if (!incidents) return []
-    const query = search.trim().toLowerCase()
-    return incidents
-      .filter((incident) => {
-        if (status !== 'all' && incident.status !== status) return false
-        if (severity !== 'all' && incident.severity !== severity) return false
-        if (query) {
-          const haystack = `${incident.id} ${incident.title} ${incident.summary}`.toLowerCase()
-          if (!haystack.includes(query)) return false
-        }
-        return true
-      })
-      .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
-  }, [incidents, search, status, severity])
+  }, [incidentAttempt, search, status, severity])
 
   const resetFilters = () => {
     setSearch('')
@@ -83,6 +71,7 @@ export function Incidents() {
     setSeverity('all')
   }
 
+  const filtered = incidents || []
   const haveActiveFilters = search !== '' || status !== 'all' || severity !== 'all'
 
   return (
@@ -191,7 +180,6 @@ export function Incidents() {
             <IncidentCard
               key={incident.id}
               incident={incident}
-              alerts={alerts ?? []}
               expanded={expandedId === incident.id}
               onToggle={() => setExpandedId((current) => (current === incident.id ? null : incident.id))}
             />
@@ -204,22 +192,24 @@ export function Incidents() {
 
 function IncidentCard({
   incident,
-  alerts,
   expanded,
   onToggle,
 }: {
-  incident: Incident
-  alerts: Alert[]
+  incident: any
   expanded: boolean
   onToggle: () => void
 }) {
-  const relatedAlerts = useMemo(
-    () =>
-      alerts
-        .filter((alert) => incident.alertIds.includes(alert.id))
-        .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()),
-    [alerts, incident.alertIds],
-  )
+  const [relatedAlerts, setRelatedAlerts] = useState<any[]>([])
+
+  useEffect(() => {
+    if (expanded) {
+      let active = true
+      getThreatAlerts(incident.id).then(data => {
+        if (active) setRelatedAlerts(data)
+      }).catch(() => {})
+      return () => { active = false }
+    }
+  }, [expanded, incident.id])
 
   const timeline = useMemo(() => {
     const events = [
@@ -228,7 +218,7 @@ function IncidentCard({
         time: alert.timestamp,
         label: `Sample alert ${alert.id} folded into the incident`,
       })),
-      { time: incident.updatedAt, label: 'Last correlation activity' },
+      { time: incident.updatedAt || incident.updated_at || incident.openedAt, label: 'Last correlation activity' },
     ]
     return events.sort((a, b) => new Date(a.time).getTime() - new Date(b.time).getTime())
   }, [incident, relatedAlerts])
@@ -263,7 +253,7 @@ function IncidentCard({
             <p className="text-[10px] uppercase tracking-wider">demo value</p>
           </div>
           <span className="rounded-lg border border-border bg-surface-2 px-2.5 py-1.5 text-xs font-semibold">
-            {incident.alertIds.length} alerts
+            {incident.alert_ids?.length || 0} alerts
           </span>
           <span className="flex h-8 w-8 items-center justify-center text-foreground-muted">
             {expanded ? (

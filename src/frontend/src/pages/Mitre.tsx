@@ -1,15 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { ExternalLink, RotateCw, Search, ShieldAlert, Target } from 'lucide-react'
-import type { Alert } from '../types/alert'
-import type { Incident } from '../types/incident'
-import { mitreTechniques } from '../data/mockMitre'
-import type { MitreTactic } from '../data/mockMitre'
-import { useAlerts } from '../hooks/useAlerts'
-import { fetchIncidents } from '../services/mockApi'
+import { getMitreTechniques, getAlerts, getThreats } from '../services/apiClient'
 import { SeverityBadge } from '../components/severity/SeverityBadge'
 
-type TacticFilter = 'all' | MitreTactic
+type MitreTactic = string
 
 const tacticOptions = [
   'Initial Access',
@@ -25,8 +20,9 @@ const tacticOptions = [
 ] as const satisfies readonly MitreTactic[]
 
 export function Mitre() {
-  const { alerts, error, refetch } = useAlerts()
-  const [incidents, setIncidents] = useState<Incident[] | null>(null)
+  const [alerts, setAlerts] = useState<any[]>([])
+  const [incidents, setIncidents] = useState<any[]>([])
+  const [techniques, setTechniques] = useState<any[] | null>(null)
   const [incidentError, setIncidentError] = useState(false)
   const [incidentAttempt, setIncidentAttempt] = useState(0)
 
@@ -37,9 +33,13 @@ export function Mitre() {
   useEffect(() => {
     let active = true
     setIncidentError(false)
-    fetchIncidents()
-      .then((data) => {
-        if (active) setIncidents(data)
+    Promise.all([getMitreTechniques(), getAlerts(), getThreats()])
+      .then(([techData, alertsData, threatsData]) => {
+        if (active) {
+          setTechniques(techData)
+          setAlerts(alertsData)
+          setIncidents(threatsData)
+        }
       })
       .catch(() => {
         if (active) setIncidentError(true)
@@ -52,7 +52,7 @@ export function Mitre() {
   const alertsByTechnique = useMemo(() => {
     const map = new Map<string, Alert[]>()
     for (const alert of alerts ?? []) {
-      for (const techniqueId of alert.mitreTechniques) {
+      for (const techniqueId of alert.mitre_techniques || alert.mitreTechniques || []) {
         const list = map.get(techniqueId) ?? []
         list.push(alert)
         map.set(techniqueId, list)
@@ -64,7 +64,7 @@ export function Mitre() {
   const incidentsByTechnique = useMemo(() => {
     const map = new Map<string, Incident[]>()
     for (const incident of incidents ?? []) {
-      for (const techniqueId of incident.mitreTechniques) {
+      for (const techniqueId of incident.mitre_techniques || incident.mitreTechniques || []) {
         const list = map.get(techniqueId) ?? []
         list.push(incident)
         map.set(techniqueId, list)
@@ -74,8 +74,9 @@ export function Mitre() {
   }, [incidents])
 
   const filtered = useMemo(() => {
+    if (!techniques) return []
     const query = search.trim().toLowerCase()
-    return mitreTechniques.filter((technique) => {
+    return techniques.filter((technique: any) => {
       if (tactic !== 'all' && !technique.tactics.includes(tactic)) return false
       if (query) {
         const haystack = `${technique.id} ${technique.name}`.toLowerCase()
@@ -83,10 +84,10 @@ export function Mitre() {
       }
       return true
     })
-  }, [search, tactic])
+  }, [techniques, search, tactic])
 
-  const dataReady = alerts !== null && incidents !== null
-  const hasError = error !== null || incidentError
+  const dataReady = techniques !== null
+  const hasError = incidentError
 
   // Keep a valid selection whenever the list changes or data finishes loading.
   useEffect(() => {
@@ -102,11 +103,10 @@ export function Mitre() {
 
   const selected = filtered.find((technique) => technique.id === selectedId) ?? null
 
-  const linkedAlertCount = alerts?.filter((alert) => alert.mitreTechniques.length > 0).length ?? 0
-  const linkedIncidentCount = incidents?.filter((incident) => incident.mitreTechniques.length > 0).length ?? 0
+  const linkedAlertCount = alerts?.filter((alert: any) => (alert.mitre_techniques?.length || alert.mitreTechniques?.length) > 0).length ?? 0
+  const linkedIncidentCount = incidents?.filter((incident: any) => (incident.mitre_techniques?.length || incident.mitreTechniques?.length) > 0).length ?? 0
 
   function refetchAll() {
-    refetch()
     setIncidentAttempt((current) => current + 1)
   }
 
@@ -275,9 +275,9 @@ function TechniqueDetail({
   alerts,
   incidents,
 }: {
-  technique: MitreTechniqueLike | null
-  alerts: Alert[]
-  incidents: Incident[]
+  technique: any | null
+  alerts: any[]
+  incidents: any[]
 }) {
   if (!technique) {
     return (
@@ -383,7 +383,7 @@ function TechniqueDetail({
   )
 }
 
-type MitreTechniqueLike = (typeof mitreTechniques)[number]
+
 
 function MitreSkeleton() {
   return (

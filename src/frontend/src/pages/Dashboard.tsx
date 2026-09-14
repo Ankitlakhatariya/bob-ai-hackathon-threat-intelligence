@@ -16,8 +16,8 @@ import {
 import type { SystemStatus, TrendPoint, TrendRange } from '../types/alert'
 import { computeSummary, severityDistribution } from '../lib/alertStats'
 import { chartColors, severityColors } from '../lib/chartTheme'
-import { fetchTrend } from '../services/mockApi'
-import { useAlerts } from '../hooks/useAlerts'
+import { getDashboardOverview, getAlertTrends, getSeverityDistribution, getRecentThreats } from '../services/apiClient'
+import { useThreatUpdates } from '../hooks/useThreatUpdates'
 import { SeverityBadge } from '../components/severity/SeverityBadge'
 import { StatusBadge } from '../components/status/StatusBadge'
 
@@ -34,69 +34,43 @@ const healthColors = {
 }
 
 export function Dashboard() {
-  const { alerts, loading, error, refetch } = useAlerts()
   const [range, setRange] = useState<TrendRange>('24h')
   const [trend, setTrend] = useState<TrendPoint[] | null>(null)
+  const [summary, setSummary] = useState<any>(null)
+  const [distribution, setDistribution] = useState<any[]>([])
+  const [recentAlerts, setRecentAlerts] = useState<any[]>([])
+  const [error, setError] = useState<string | null>(null)
+  const [loading, setLoading] = useState(true)
+
+  const fetchDashboardData = async () => {
+    try {
+      setLoading(true)
+      const [overviewData, trendData, distData, alertsData] = await Promise.all([
+        getDashboardOverview(),
+        getAlertTrends(range),
+        getSeverityDistribution(),
+        getRecentThreats()
+      ])
+      setSummary(overviewData)
+      setTrend(trendData)
+      setDistribution(distData)
+      setRecentAlerts(alertsData)
+      setError(null)
+    } catch (err: any) {
+      setError(err.message || 'Could not load dashboard data')
+    } finally {
+      setLoading(false)
+    }
+  }
 
   useEffect(() => {
-    let active = true
-    setTrend(null)
-    fetchTrend(range).then((data) => {
-      if (active) setTrend(data)
-    })
-    return () => {
-      active = false
-    }
+    fetchDashboardData()
   }, [range])
 
   // Minimal WebSocket Integration for Real-Time Threat Updates
-  useEffect(() => {
-    // In a production app, retrieve the actual JWT from auth context/storage
-    const token = localStorage.getItem('auth_token') || 'demo_token'
-    const wsUrl = `ws://localhost:5000/api/v1/ws/threats?token=${token}`
-    
-    let ws: WebSocket | null = null
-    try {
-      ws = new WebSocket(wsUrl)
-      
-      ws.onopen = () => {
-        console.log('WebSocket connected for real-time updates')
-      }
-      
-      ws.onmessage = (event) => {
-        try {
-          const payload = JSON.parse(event.data)
-          console.log('Real-time update received:', payload.event_type)
-          // Trigger a refresh of the REST APIs when an event occurs
-          refetch()
-        } catch (err) {
-          console.error('Error parsing WS message', err)
-        }
-      }
-      
-      ws.onclose = () => {
-        console.log('WebSocket disconnected')
-      }
-    } catch (err) {
-      console.warn('WebSocket connection failed:', err)
-    }
-    
-    return () => {
-      if (ws) ws.close()
-    }
-  }, [refetch])
-
-  const summary = useMemo(() => (alerts ? computeSummary(alerts) : null), [alerts])
-  const distribution = useMemo(() => (alerts ? severityDistribution(alerts) : []), [alerts])
-  const recentAlerts = useMemo(
-    () =>
-      alerts
-        ? [...alerts]
-            .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
-            .slice(0, 5)
-        : [],
-    [alerts],
-  )
+  useThreatUpdates(() => {
+    fetchDashboardData()
+  })
 
   return (
     <div className="mx-auto max-w-6xl">
@@ -142,14 +116,14 @@ export function Dashboard() {
           <p className="text-sm text-foreground-muted">{error}</p>
           <button
             type="button"
-            onClick={refetch}
+            onClick={fetchDashboardData}
             className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-surface px-4 py-2 text-sm font-semibold text-foreground transition-colors hover:bg-surface-2"
           >
             <RotateCw className="h-4 w-4" aria-hidden="true" />
             Retry
           </button>
         </div>
-      ) : loading || alerts === null ? (
+      ) : loading ? (
         <DashboardSkeleton />
       ) : (
         <>
@@ -160,7 +134,7 @@ export function Dashboard() {
                   icon={Bell}
                   label="Open alerts"
                   value={summary.totalOpen}
-                  note={`${rangeLabel(range)} · sample`}
+                  note={`${rangeLabel(range)}`}
                 />
                 <StatCard
                   icon={AlertTriangle}
@@ -337,14 +311,14 @@ export function Dashboard() {
                       <tr key={alert.id} className="border-b border-border/60 last:border-0">
                         <td className="px-5 py-3">
                           <p className="font-medium">{alert.title}</p>
-                          <p className="mt-0.5 font-mono text-xs text-foreground-muted">{alert.id}</p>
+                          <p className="mt-0.5 font-mono text-xs text-foreground-muted">{alert.id.substring(0, 8)}</p>
                         </td>
-                        <td className="px-4 py-3 text-foreground-muted">{alert.sourceLabel}</td>
+                        <td className="px-4 py-3 text-foreground-muted">{alert.source || alert.sourceLabel || 'Unknown'}</td>
                         <td className="px-4 py-3">
                           <SeverityBadge severity={alert.severity} />
                         </td>
                         <td className="px-4 py-3">
-                          <RiskScore score={alert.riskScore} />
+                          <RiskScore score={alert.risk_score || alert.riskScore || 0} />
                         </td>
                         <td className="px-4 py-3">
                           <StatusBadge status={alert.status} />

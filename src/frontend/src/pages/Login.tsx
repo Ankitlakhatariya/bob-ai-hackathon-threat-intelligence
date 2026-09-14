@@ -16,7 +16,8 @@ import {
 } from 'lucide-react'
 import { ThreatLensLogo } from '../components/logo/ThreatLensLogo'
 import { useTheme } from '../components/theme/ThemeProvider'
-import { startDemoSession } from '../lib/demoSession'
+import { login, getAuthMe, ApiError } from '../services/apiClient'
+import { setTokens, setAuthSession } from '../lib/authSession'
 
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
@@ -51,14 +52,26 @@ export function Login() {
     return next
   }
 
-  function simulateSignIn(displayName: string) {
+  async function performSignIn(emailToUse: string, passwordToUse: string) {
     setStatus('submitting')
-    setSessionName(displayName)
-    window.setTimeout(() => {
-      startDemoSession(displayName)
+    setErrors({})
+    try {
+      const loginData = await login(emailToUse, passwordToUse)
+      setTokens(loginData.access_token, loginData.refresh_token)
+      
+      const meData = await getAuthMe()
+      setAuthSession({
+        user: meData.user,
+        role: meData.role
+      })
+      
+      setSessionName(meData.user.full_name || emailToUse)
       setStatus('success')
       window.setTimeout(() => navigate('/dashboard'), 700)
-    }, 900)
+    } catch (err: any) {
+      setStatus('idle')
+      setErrors({ email: err.message || 'Authentication failed. Check credentials.' })
+    }
   }
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -67,13 +80,13 @@ export function Login() {
     const nextErrors = validate()
     setErrors(nextErrors)
     if (Object.keys(nextErrors).length > 0) return
-    simulateSignIn(email.trim().split('@')[0])
+    performSignIn(email.trim(), password)
   }
 
   function handleDemoAccess() {
     if (status !== 'idle') return
-    setErrors({})
-    simulateSignIn('Demo Analyst')
+    // Demo access maps to the seeded test user from backend
+    performSignIn('test-analyst-soc@threatlens.io', 'SecurePassword123!')
   }
 
   const panel = (

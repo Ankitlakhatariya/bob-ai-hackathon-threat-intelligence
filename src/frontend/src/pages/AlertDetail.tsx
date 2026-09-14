@@ -13,7 +13,7 @@ import {
   ShieldAlert,
   ShieldCheck,
 } from 'lucide-react'
-import { useAlerts } from '../hooks/useAlerts'
+import { getAlert, getRelatedAlerts } from '../services/apiClient'
 import { incidentExplanations, incidentTitles } from '../data/mockAlerts'
 import { SeverityBadge } from '../components/severity/SeverityBadge'
 import { StatusBadge } from '../components/status/StatusBadge'
@@ -83,19 +83,34 @@ function buildTimeline(alert: Alert): TimelineEvent[] {
 
 export function AlertDetail() {
   const { alertId } = useParams<{ alertId: string }>()
-  const { alerts, loading, error, refetch } = useAlerts()
+  const [alert, setAlert] = useState<any>(null)
+  const [related, setRelated] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
-  const alert = alerts?.find((item) => item.id === alertId) ?? null
+  const fetchAlertDetail = async () => {
+    if (!alertId) return
+    try {
+      setLoading(true)
+      const data = await getAlert(alertId)
+      setAlert(data)
+      try {
+        const relatedData = await getRelatedAlerts(alertId)
+        setRelated(relatedData.map((item: any) => item.relatedAlert).filter(Boolean))
+      } catch {
+        setRelated([])
+      }
+      setError(null)
+    } catch (err: any) {
+      setError(err.message || 'Could not load alert details')
+    } finally {
+      setLoading(false)
+    }
+  }
 
-  const related = useMemo(
-    () =>
-      alerts && alert
-        ? alerts.filter(
-            (item) => item.relatedIncidentId !== null && item.relatedIncidentId === alert.relatedIncidentId && item.id !== alert.id,
-          )
-        : [],
-    [alerts, alert],
-  )
+  useEffect(() => {
+    fetchAlertDetail()
+  }, [alertId])
 
   const timeline = useMemo(() => (alert ? buildTimeline(alert) : []), [alert])
 
@@ -138,7 +153,7 @@ export function AlertDetail() {
         <p className="text-sm text-foreground-muted">{error}</p>
         <button
           type="button"
-          onClick={refetch}
+          onClick={fetchAlertDetail}
           className="inline-flex items-center rounded-lg border border-border bg-surface px-4 py-2 text-sm font-semibold text-foreground transition-colors hover:bg-surface-2"
         >
           Retry
@@ -167,8 +182,8 @@ export function AlertDetail() {
     )
   }
 
-  const incidentTitle = alert.relatedIncidentId
-    ? incidentTitles[alert.relatedIncidentId] ?? alert.relatedIncidentId
+  const incidentTitle = (alert.related_threat_id || alert.relatedIncidentId)
+    ? incidentTitles[(alert.related_threat_id || alert.relatedIncidentId)] ?? (alert.related_threat_id || alert.relatedIncidentId)
     : null
 
   return (
@@ -204,7 +219,7 @@ export function AlertDetail() {
               <DetailItem label="Source" value={alert.sourceLabel} mono={false} />
               <DetailItem label="Detected" value={formatTime(alert.timestamp)} mono={false} />
               <DetailItem label="Alert ID" value={alert.id} mono />
-              <DetailItem label="Risk score" value={`${alert.riskScore} / 100`} mono />
+              <DetailItem label="Risk score" value={`${alert.risk_score || alert.riskScore} / 100`} mono />
             </dl>
             <div className="mt-4">
               <p className="text-xs font-medium text-foreground-muted">Risk score</p>
@@ -213,12 +228,12 @@ export function AlertDetail() {
                   <div
                     className="h-full rounded-full"
                     style={{
-                      width: `${alert.riskScore}%`,
+                      width: `${alert.risk_score || alert.riskScore}%`,
                       backgroundColor: riskTone[alert.severity],
                     }}
                   />
                 </div>
-                <span className="font-mono text-sm font-semibold">{alert.riskScore}</span>
+                <span className="font-mono text-sm font-semibold">{alert.risk_score || alert.riskScore}</span>
               </div>
             </div>
           </section>
@@ -232,7 +247,7 @@ export function AlertDetail() {
               </span>
             </div>
             <ul className="mt-4 space-y-2">
-              {alert.indicators.map((indicator) => (
+              {alert.indicators && alert.indicators.map((indicator: string) => (
                 <EvidenceRow key={indicator} value={indicator} />
               ))}
             </ul>
@@ -278,7 +293,7 @@ export function AlertDetail() {
         </div>
 
         <div className="space-y-5">
-          {alert.relatedIncidentId ? (
+          {alert.related_threat_id || alert.relatedIncidentId ? (
             <section className="rounded-xl border border-border bg-surface p-5">
               <div className="flex items-center gap-2">
                 <GitBranch className="h-4 w-4 text-accent" aria-hidden="true" />
@@ -286,11 +301,11 @@ export function AlertDetail() {
               </div>
               <p className="mt-3 text-sm text-foreground-muted">
                 Correlated into{' '}
-                <span className="font-semibold text-foreground">{alert.relatedIncidentId}</span>
+                <span className="font-semibold text-foreground">{alert.related_threat_id || alert.relatedIncidentId}</span>
                 {incidentTitle ? ` — ${incidentTitle}` : ''}.
               </p>
               <p className="mt-2 text-sm leading-relaxed text-foreground-muted">
-                {incidentExplanations[alert.relatedIncidentId] ??
+                {incidentExplanations[alert.related_threat_id || alert.relatedIncidentId] ??
                   'Why this alert joins the incident is described by the correlation engine. Demo mapping.'}
               </p>
               <div className="mt-4">

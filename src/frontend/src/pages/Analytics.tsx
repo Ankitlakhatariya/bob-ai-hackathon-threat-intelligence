@@ -23,8 +23,7 @@ import type { AlertStatus, TrendPoint, TrendRange } from '../types/alert'
 import type { Incident, IncidentStatus } from '../types/incident'
 import { computeSummary, severityDistribution } from '../lib/alertStats'
 import { chartColors, incidentStatusColors, severityColors, statusColors } from '../lib/chartTheme'
-import { fetchIncidents, fetchTrend } from '../services/mockApi'
-import { useAlerts } from '../hooks/useAlerts'
+import { getThreats, getAlertTrends, getAlerts } from '../services/apiClient'
 
 const statusLabels: Record<AlertStatus, string> = {
   open: 'Open',
@@ -53,10 +52,11 @@ const trendOptions: { value: TrendRange; label: string }[] = [
 ]
 
 export function Analytics() {
-  const { alerts, error, refetch } = useAlerts()
-  const [incidents, setIncidents] = useState<Incident[] | null>(null)
+  const [alerts, setAlerts] = useState<any[] | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const [incidents, setIncidents] = useState<any[] | null>(null)
   const [incidentError, setIncidentError] = useState(false)
-  const [incidentAttempt, setIncidentAttempt] = useState(0)
+  const [fetchAttempt, setFetchAttempt] = useState(0)
 
   const [range, setRange] = useState<TrendRange>('24h')
   const [trend, setTrend] = useState<TrendPoint[] | null>(null)
@@ -64,7 +64,7 @@ export function Analytics() {
   useEffect(() => {
     let active = true
     setTrend(null)
-    fetchTrend(range).then((data) => {
+    getAlertTrends(range).then((data) => {
       if (active) setTrend(data)
     })
     return () => {
@@ -74,18 +74,26 @@ export function Analytics() {
 
   useEffect(() => {
     let active = true
+    setError(null)
     setIncidentError(false)
-    fetchIncidents()
-      .then((data) => {
-        if (active) setIncidents(data)
+
+    Promise.all([getAlerts(), getThreats()])
+      .then(([alertsData, threatsData]) => {
+        if (active) {
+          setAlerts(alertsData)
+          setIncidents(threatsData)
+        }
       })
-      .catch(() => {
-        if (active) setIncidentError(true)
+      .catch((err) => {
+        if (active) {
+          setError(err.message || 'Could not load analytics')
+          setIncidentError(true)
+        }
       })
     return () => {
       active = false
     }
-  }, [incidentAttempt])
+  }, [fetchAttempt])
 
   const summary = useMemo(() => (alerts ? computeSummary(alerts) : null), [alerts])
 
@@ -124,8 +132,7 @@ export function Analytics() {
   const hasError = error !== null || incidentError
 
   function refetchAll() {
-    refetch()
-    setIncidentAttempt((current) => current + 1)
+    setFetchAttempt((current) => current + 1)
   }
 
   return (
