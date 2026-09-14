@@ -1,9 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Activity, ChevronDown, ChevronUp, GitBranch, Network, RotateCw, Search, ShieldAlert } from 'lucide-react'
-import type { Alert, Severity } from '../types/alert'
-import type { Incident, IncidentStatus } from '../types/incident'
-import { incidentExplanations } from '../data/mockAlerts'
 import { getThreats, getThreatAlerts } from '../services/apiClient'
 import { severityColors } from '../lib/chartTheme'
 import { SeverityBadge } from '../components/severity/SeverityBadge'
@@ -274,8 +271,7 @@ function IncidentCard({
                 <h3 className="text-sm font-semibold">Why these alerts correlate</h3>
               </div>
               <p className="mt-2 text-sm leading-relaxed text-foreground-muted">
-                {incidentExplanations[incident.id] ??
-                  'The correlation engine grouped these sample alerts based on shared patterns. Demo mapping.'}
+                The correlation engine grouped these sample alerts based on shared patterns. Demo mapping.
               </p>
 
               <h3 className="mt-6 flex items-center gap-2 text-sm font-semibold">

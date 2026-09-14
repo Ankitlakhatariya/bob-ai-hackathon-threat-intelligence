@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { ArrowRight, RotateCw, Search, ShieldAlert } from 'lucide-react'
 import type { AlertSource, AlertStatus, Severity } from '../types/alert'
-import { incidentTitles } from '../data/mockAlerts'
+
 import { useAlerts } from '../hooks/useAlerts'
 import { SeverityBadge } from '../components/severity/SeverityBadge'
 import { StatusBadge } from '../components/status/StatusBadge'
@@ -274,7 +274,7 @@ function formatTimestamp(value: string) {
                       </td>
                       <td className="px-4 py-3 text-foreground-muted">
                         {alert.related_threat_id || alert.relatedIncidentId
-                          ? incidentTitles[alert.related_threat_id || alert.relatedIncidentId] ?? (alert.related_threat_id || alert.relatedIncidentId)
+                          ? (alert.related_threat_id || alert.relatedIncidentId)
                           : '—'}
                       </td>
                       <td className="px-4 py-3">

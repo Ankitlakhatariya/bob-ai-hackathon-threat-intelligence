@@ -14,7 +14,7 @@ import {
   ShieldCheck,
 } from 'lucide-react'
 import { getAlert, getRelatedAlerts } from '../services/apiClient'
-import { incidentExplanations, incidentTitles } from '../data/mockAlerts'
+
 import { SeverityBadge } from '../components/severity/SeverityBadge'
 import { StatusBadge } from '../components/status/StatusBadge'
 import type { Alert } from '../types/alert'
@@ -182,10 +182,6 @@ export function AlertDetail() {
     )
   }
 
-  const incidentTitle = (alert.related_threat_id || alert.relatedIncidentId)
-    ? incidentTitles[(alert.related_threat_id || alert.relatedIncidentId)] ?? (alert.related_threat_id || alert.relatedIncidentId)
-    : null
-
   return (
     <div className="mx-auto max-w-6xl">
       <Link
@@ -301,12 +297,10 @@ export function AlertDetail() {
               </div>
               <p className="mt-3 text-sm text-foreground-muted">
                 Correlated into{' '}
-                <span className="font-semibold text-foreground">{alert.related_threat_id || alert.relatedIncidentId}</span>
-                {incidentTitle ? ` — ${incidentTitle}` : ''}.
+                <span className="font-semibold text-foreground">{alert.related_threat_id || alert.relatedIncidentId}</span>.
               </p>
               <p className="mt-2 text-sm leading-relaxed text-foreground-muted">
-                {incidentExplanations[alert.related_threat_id || alert.relatedIncidentId] ??
-                  'Why this alert joins the incident is described by the correlation engine. Demo mapping.'}
+                The correlation engine grouped this alert with others based on shared entities.
               </p>
               <div className="mt-4">
                 <Link
