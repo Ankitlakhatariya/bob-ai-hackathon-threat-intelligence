@@ -21,3 +21,15 @@ class ThreatAnalysisResponse(BaseModel):
     recommended_investigation_focus: List[str] = Field(..., description="Specific next steps for analysts")
     bluf: str = Field(..., description="Bottom Line Up Front - Commander-friendly summary")
     priority_explanation: str = Field(..., description="Explanation of why this threat has its current priority/risk score")
+
+
+class BlufLLMResponse(BaseModel):
+    bottom_line: str = Field(..., description="What commanders need to know immediately")
+    situation: str = Field(..., description="What happened")
+    assessment: str = Field(..., description="What the evidence currently indicates")
+    impact: str = Field(..., description="Potentially affected assets/systems")
+    evidence: List[str] = Field(..., description="Most important supporting evidence")
+    mitre_context: str = Field(..., description="Relevant observed MITRE ATT&CK techniques")
+    uncertainties: str = Field(..., description="What is not yet known")
+    recommended_focus: str = Field(..., description="What analysts should examine next")
+    priority: str = Field(..., description="Explanation of existing deterministic priority/risk")

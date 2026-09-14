@@ -7,7 +7,7 @@ import openai
 
 from app.core.config import settings
 from app.core.logging import logger
-from app.schemas.llm import ThreatAnalysisResponse
+from app.schemas.llm import ThreatAnalysisResponse, BlufLLMResponse
 
 
 class OpenAIThreatAnalysisService:
@@ -59,6 +59,30 @@ class OpenAIThreatAnalysisService:
             logger.error(f"OpenAI API call failed: {str(e)}")
             raise e
 
+    @retry(
+        wait=wait_exponential(multiplier=1, min=2, max=10),
+        stop=stop_after_attempt(3),
+        retry=retry_if_exception_type((openai.RateLimitError, openai.APIConnectionError, openai.APITimeoutError)),
+        reraise=True
+    )
+    async def _call_openai_structured_bluf(self, messages: list) -> BlufLLMResponse:
+        if not self.is_configured():
+            raise RuntimeError("OpenAI is not configured. OPENAI_API_KEY is missing.")
+        try:
+            response = await self.client.beta.chat.completions.parse(
+                model=self.model,
+                messages=messages,
+                response_format=BlufLLMResponse,
+                temperature=0.1,
+            )
+            parsed = response.choices[0].message.parsed
+            if not parsed:
+                raise ValueError("Parsed response was empty.")
+            return parsed
+        except Exception as e:
+            logger.error(f"BLUF LLM call failed: {str(e)}")
+            raise e
+
     def _build_system_prompt(self) -> str:
         return (
             "You are a defensive cybersecurity intelligence analysis assistant.\n"
@@ -94,3 +118,18 @@ class OpenAIThreatAnalysisService:
         ]
 
         return await self._call_openai_structured(messages)
+
+    async def generate_bluf(self, threat_context: Dict[str, Any]) -> BlufLLMResponse:
+        system_prompt = self._build_system_prompt()
+        user_prompt = (
+            "Generate a concise, commander-ready BLUF (Bottom Line Up Front) report based on this evidence.\n"
+            "Format the output strictly according to the schema provided.\n\n"
+            "=== UNTRUSTED SECURITY EVIDENCE BEGIN ===\n"
+            f"{json.dumps(threat_context, indent=2, default=str)}\n"
+            "=== UNTRUSTED SECURITY EVIDENCE END ===\n"
+        )
+        messages = [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt}
+        ]
+        return await self._call_openai_structured_bluf(messages)

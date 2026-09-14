@@ -4,6 +4,8 @@ from sqlalchemy import select
 from app.models.bluf import BlufReport
 from app.models.threat import Threat
 from app.models.alert import Alert
+from app.services.llm_service import OpenAIThreatAnalysisService
+from app.schemas.llm import BlufLLMResponse
 
 
 STANDARD_BRIEFS: Dict[str, Dict[str, any]] = {
@@ -52,28 +54,13 @@ STANDARD_BRIEFS: Dict[str, Dict[str, any]] = {
 
 class BlufService:
     @classmethod
-    async def get_or_generate_bluf(cls, db: AsyncSession, threat_id: str) -> Optional[BlufReport]:
-        stmt = select(BlufReport).where(BlufReport.threat_id == threat_id)
-        result = await db.execute(stmt)
-        report = result.scalars().first()
-
-        if report:
-            return report
-
-        # Check standard briefs
-        if threat_id in STANDARD_BRIEFS:
-            brief_data = STANDARD_BRIEFS[threat_id]
-            report = BlufReport(
-                threat_id=threat_id,
-                bottom_line=brief_data["bottom_line"],
-                impact=brief_data["impact"],
-                key_evidence=brief_data["key_evidence"],
-                recommended_focus=brief_data["recommended_focus"],
-            )
-            db.add(report)
-            await db.commit()
-            await db.refresh(report)
-            return report
+    async def get_or_generate_bluf(cls, db: AsyncSession, threat_id: str, force_regenerate: bool = False) -> Optional[BlufReport]:
+        if not force_regenerate:
+            stmt = select(BlufReport).where(BlufReport.threat_id == threat_id)
+            result = await db.execute(stmt)
+            report = result.scalars().first()
+            if report:
+                return report
 
         # Fallback dynamic generation based on threat record
         threat = await db.get(Threat, threat_id)
@@ -85,16 +72,70 @@ class BlufService:
         alerts_res = await db.execute(alerts_stmt)
         alerts = list(alerts_res.scalars().all())
 
-        evidence = [f"{a.id} — {a.title} ({a.source_label})" for a in alerts] or [f"{threat.id} — Primary correlated event"]
+        llm_service = OpenAIThreatAnalysisService()
 
-        report = BlufReport(
-            threat_id=threat_id,
-            bottom_line=threat.summary,
-            impact=f"Severity {threat.severity.value.upper()} incident impacting security posture. Confidence {threat.confidence}%.",
-            key_evidence=evidence,
-            recommended_focus=f"Prioritize containment of alerts related to {threat.title} and review indicators.",
-        )
-        db.add(report)
+        if llm_service.is_configured():
+            threat_context = {
+                "threat": {
+                    "id": threat.id,
+                    "title": threat.title,
+                    "summary": threat.summary,
+                    "severity": threat.severity,
+                    "risk_score": threat.risk_score,
+                    "confidence": threat.confidence,
+                    "affected_assets": threat.affected_assets,
+                    "mitre_techniques": threat.mitre_techniques
+                },
+                "alerts": [
+                    {
+                        "id": a.id,
+                        "title": a.title,
+                        "description": a.description,
+                        "severity": a.severity,
+                        "source": a.source,
+                        "indicators": a.indicators
+                    } for a in alerts
+                ]
+            }
+            try:
+                bluf_resp: BlufLLMResponse = await llm_service.generate_bluf(threat_context)
+                
+                bottom_line = f"**BOTTOM LINE:**\\n{bluf_resp.bottom_line}\\n\\n**SITUATION:**\\n{bluf_resp.situation}\\n\\n**ASSESSMENT:**\\n{bluf_resp.assessment}"
+                impact = f"**IMPACT:**\\n{bluf_resp.impact}\\n\\n**MITRE ATT&CK:**\\n{bluf_resp.mitre_context}\\n\\n**UNCERTAINTIES:**\\n{bluf_resp.uncertainties}"
+                key_evidence = bluf_resp.evidence
+                recommended_focus = f"**RECOMMENDED FOCUS:**\\n{bluf_resp.recommended_focus}\\n\\n**PRIORITY:**\\n{bluf_resp.priority}"
+                generated_by = f"AI Analysis ({llm_service.model})"
+                
+            except Exception:
+                # Fallback on LLM failure
+                bottom_line = threat.summary
+                impact = f"Severity {threat.severity.value.upper()} incident impacting security posture."
+                key_evidence = [f"{a.id} — {a.title} ({a.source_label})" for a in alerts] or [f"{threat.id} — Primary correlated event"]
+                recommended_focus = f"Prioritize containment of alerts related to {threat.title} and review indicators."
+                generated_by = "ThreatLens Correlation Engine (Fallback)"
+        else:
+            # Fallback when LLM not configured
+            bottom_line = threat.summary
+            impact = f"Severity {threat.severity.value.upper()} incident impacting security posture."
+            key_evidence = [f"{a.id} — {a.title} ({a.source_label})" for a in alerts] or [f"{threat.id} — Primary correlated event"]
+            recommended_focus = f"Prioritize containment of alerts related to {threat.title} and review indicators."
+            generated_by = "ThreatLens Correlation Engine (Static)"
+
+        # Save or update report
+        stmt = select(BlufReport).where(BlufReport.threat_id == threat_id)
+        result = await db.execute(stmt)
+        report = result.scalars().first()
+        
+        if not report:
+            report = BlufReport(threat_id=threat_id)
+            db.add(report)
+
+        report.bottom_line = bottom_line
+        report.impact = impact
+        report.key_evidence = key_evidence
+        report.recommended_focus = recommended_focus
+        report.generated_by = generated_by
+
         await db.commit()
         await db.refresh(report)
         return report

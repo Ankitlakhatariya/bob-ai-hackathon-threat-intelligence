@@ -29,7 +29,7 @@ async def get_bluf_report(threat_id: str, db: AsyncSession = Depends(get_db)):
 @router.post("/{threat_id}/generate", response_model=BlufReportRead)
 async def generate_bluf_report(threat_id: str, db: AsyncSession = Depends(get_db)):
     """Generates / refreshes an executive BLUF brief for an incident."""
-    report = await BlufService.get_or_generate_bluf(db, threat_id)
+    report = await BlufService.get_or_generate_bluf(db, threat_id, force_regenerate=True)
     if not report:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
