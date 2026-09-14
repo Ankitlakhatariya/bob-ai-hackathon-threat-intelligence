@@ -80,14 +80,21 @@ ThreatLens brings alert triage, incident investigation, MITRE ATT&CK context, an
 git clone https://github.com/Ankitlakhatariya/bob-ai-hackathon-threat-intelligence.git
 cd bob-ai-hackathon-threat-intelligence
 
-# 2. Install dependencies
+# 2. Run with Docker
+docker build -t threatlens .
+docker run --rm -p 8080:80 threatlens
+
+# Open http://localhost:8080
+```
+
+For local development without Docker:
+
+```bash
+# Install dependencies
 cd src/frontend && npm install
 
-# 3. Configure environment
-# No environment variables are required for the current mock-data prototype.
-
-# 4. Run the project
-cd src/frontend && npm run dev
+# Start the Vite development server
+npm run dev
 ```
 
 ---

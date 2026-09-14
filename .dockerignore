@@ -1,0 +1,12 @@
+.git
+.github
+node_modules
+**/node_modules
+dist
+**/dist
+*.log
+.env
+.env.*
+!src/frontend/.env.example
+demo/screenshots
+presentation
