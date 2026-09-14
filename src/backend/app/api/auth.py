@@ -22,11 +22,12 @@ from app.schemas.auth import (
 )
 from app.models.audit_log import AuditLog
 from app.core.logging import logger
+from app.core.rate_limit import login_rate_limiter
 
 router = APIRouter()
 
 
-@router.post("/register", response_model=TokenResponse, status_code=status.HTTP_201_CREATED)
+@router.post("/register", response_model=TokenResponse, status_code=status.HTTP_201_CREATED, dependencies=[Depends(login_rate_limiter)])
 async def register(payload: UserRegisterRequest, db: AsyncSession = Depends(get_db)):
     """Registers a new user with secure password hashing and returns JWT tokens."""
     stmt = select(User).where(User.email == payload.email)
@@ -89,7 +90,7 @@ async def register(payload: UserRegisterRequest, db: AsyncSession = Depends(get_
     )
 
 
-@router.post("/login", response_model=TokenResponse)
+@router.post("/login", response_model=TokenResponse, dependencies=[Depends(login_rate_limiter)])
 async def login(payload: UserLoginRequest, db: AsyncSession = Depends(get_db)):
     """Authenticates with email and password, issuing access and refresh tokens."""
     stmt = select(User).where(User.email == payload.email)

@@ -11,12 +11,13 @@ from app.models.bluf import BlufReport
 from app.services.llm_service import OpenAIThreatAnalysisService
 from app.schemas.llm import ThreatAnalysisResponse
 from app.schemas.bluf import BlufReportCreate, BlufReportResponse
+from app.core.rate_limit import llm_rate_limiter
 
 router = APIRouter()
 llm_service = OpenAIThreatAnalysisService()
 
 
-@router.post("/analyze-threat/{threat_id}", response_model=Dict[str, Any])
+@router.post("/analyze-threat/{threat_id}", response_model=Dict[str, Any], dependencies=[Depends(llm_rate_limiter)])
 async def analyze_threat(threat_id: str, db: AsyncSession = Depends(get_db)):
     """
     Generate an LLM analysis of a threat and its associated alerts.
@@ -95,7 +96,7 @@ async def analyze_threat(threat_id: str, db: AsyncSession = Depends(get_db)):
         raise HTTPException(status_code=502, detail=f"LLM Service Error: {str(e)}")
 
 
-@router.post("/generate-bluf/{threat_id}", response_model=BlufReportResponse)
+@router.post("/generate-bluf/{threat_id}", response_model=BlufReportResponse, dependencies=[Depends(llm_rate_limiter)])
 async def generate_bluf(threat_id: str, db: AsyncSession = Depends(get_db)):
     """
     Generate a BLUF (Bottom Line Up Front) report using the LLM.

@@ -18,6 +18,7 @@ from app.services.threat_scoring import ThreatScoringEngine
 from app.services.correlation import CorrelationEngine
 from app.services.ingestion import AlertIngestionEngine
 from app.core.logging import logger
+from app.core.rate_limit import bulk_ingest_rate_limiter
 
 router = APIRouter()
 
@@ -309,7 +310,7 @@ async def create_alert(payload: Dict[str, Any], db: AsyncSession = Depends(get_d
     "/bulk",
     response_model=AlertBulkIngestResponse,
     status_code=status.HTTP_201_CREATED,
-    dependencies=[Depends(require_permission(Permission.ALERTS_WRITE))],
+    dependencies=[Depends(require_permission(Permission.ALERTS_WRITE)), Depends(bulk_ingest_rate_limiter)],
 )
 async def bulk_ingest_alerts(alerts_payload: List[Dict[str, Any]], db: AsyncSession = Depends(get_db)):
     """High-throughput bulk ingestion pipeline for SIEM, EDR, and network feeds."""

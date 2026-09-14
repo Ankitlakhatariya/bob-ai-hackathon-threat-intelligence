@@ -23,6 +23,7 @@ from app.schemas.correlation import CorrelationResult
 from app.schemas.mitre import MitreTechniqueRead
 from app.services.correlation import CorrelationEngine
 from app.services.threat_scoring import ThreatScoringEngine
+from app.core.rate_limit import bulk_ingest_rate_limiter
 
 router = APIRouter()
 
@@ -298,7 +299,7 @@ async def get_threat_risk_breakdown(threat_id: str, db: AsyncSession = Depends(g
 @router.post(
     "/correlate",
     response_model=CorrelationResult,
-    dependencies=[Depends(require_permission(Permission.CORRELATION_RUN))],
+    dependencies=[Depends(require_permission(Permission.CORRELATION_RUN)), Depends(bulk_ingest_rate_limiter)],
 )
 async def trigger_correlation(db: AsyncSession = Depends(get_db)):
     """Triggers the deterministic correlation engine over alerts and groups them into threats."""

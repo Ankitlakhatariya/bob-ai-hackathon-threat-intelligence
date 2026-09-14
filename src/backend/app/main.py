@@ -9,6 +9,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.core.config import settings
 from app.core.logging import setup_logging, logger
+from app.core.middleware import RequestSizeLimitMiddleware, SecurityHeadersMiddleware
 from app.api import api_router
 from app.database.session import check_database_connection, AsyncSessionLocal
 from app.database.database import Base
@@ -345,6 +346,10 @@ app = FastAPI(
     openapi_url="/api/openapi.json",
     lifespan=lifespan,
 )
+
+# Security Middlewares
+app.add_middleware(RequestSizeLimitMiddleware, max_body_size=2 * 1024 * 1024) # 2MB limit
+app.add_middleware(SecurityHeadersMiddleware)
 
 # CORS Middleware
 app.add_middleware(

@@ -19,7 +19,7 @@ REFRESH_TOKEN_EXPIRE_DAYS = 7
 def get_password_hash(password: str) -> str:
     """Generates a cryptographically secure salted hash using PBKDF2 with SHA-256."""
     salt = secrets.token_hex(16)
-    key = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt.encode("utf-8"), 100_000)
+    key = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt.encode("utf-8"), 600_000)
     return f"{salt}:{key.hex()}"
 
 
@@ -29,7 +29,7 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
         if not hashed_password or ":" not in hashed_password:
             return False
         salt, key = hashed_password.split(":", 1)
-        test_key = hashlib.pbkdf2_hmac("sha256", plain_password.encode("utf-8"), salt.encode("utf-8"), 100_000)
+        test_key = hashlib.pbkdf2_hmac("sha256", plain_password.encode("utf-8"), salt.encode("utf-8"), 600_000)
         return secrets.compare_digest(key, test_key.hex())
     except Exception as e:
         logger.error(f"Password verification error: {e}")
@@ -86,12 +86,9 @@ def decode_token(token: str) -> Dict[str, Any]:
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail={"error": {"code": "TOKEN_EXPIRED", "message": "Access token has expired"}}
         )
-    except jwt.InvalidTokenError:
-        # Check if it was issued by Supabase Auth directly
-        try:
-            return jwt.decode(token, options={"verify_signature": False})
-        except Exception:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail={"error": {"code": "INVALID_TOKEN", "message": "Invalid authentication token"}}
-            )
+    except jwt.InvalidTokenError as e:
+        logger.warning(f"JWT validation failed: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail={"error": {"code": "INVALID_TOKEN", "message": "Invalid authentication token signature"}}
+        )
