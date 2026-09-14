@@ -23,6 +23,10 @@ class Settings(BaseSettings):
     SUPABASE_DB_URL: str = "postgresql+asyncpg://postgres:Dhruv%40898689@db.vxqrcffxhkvwlbastvus.supabase.co:5432/postgres"
     DATABASE_URL_SYNC: str = "postgresql://postgres:Dhruv%40898689@db.vxqrcffxhkvwlbastvus.supabase.co:5432/postgres"
 
+    # OpenAI Configuration
+    OPENAI_API_KEY: Union[str, None] = None
+    OPENAI_MODEL: str = "gpt-5.6-sol"
+
     # JWT Settings for Supabase Auth
     JWT_AUDIENCE: str = "authenticated"
     JWT_ISSUER: str = ""

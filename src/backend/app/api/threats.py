@@ -7,6 +7,8 @@ from app.core.dependencies import get_db, require_permission, get_current_user
 from app.core.permissions import Permission
 from app.models.threat import Threat, ThreatSeverity, ThreatStatus
 from app.models.alert import Alert, AlertSeverity
+from app.models.bluf import BlufReport
+from app.models.llm_analysis import LLMAnalysis
 from app.models.mitre import MitreTechnique
 from app.schemas.threat import (
     ThreatRead,
@@ -16,6 +18,7 @@ from app.schemas.threat import (
     ThreatRiskResponse,
 )
 from app.schemas.alert import AlertRead
+from app.schemas.bluf import BlufReportResponse
 from app.schemas.correlation import CorrelationResult
 from app.schemas.mitre import MitreTechniqueRead
 from app.services.correlation import CorrelationEngine
@@ -68,6 +71,50 @@ async def get_prioritized_threats(
         t.priority = ThreatScoringEngine.get_priority_band(t.risk_score)
 
     return threats
+
+
+@router.get("/{threat_id}/bluf", response_model=BlufReportResponse)
+async def get_threat_bluf(
+    threat_id: str,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Retrieve the BLUF brief for a specific threat.
+    """
+    query = select(BlufReport).where(BlufReport.threat_id == threat_id)
+    result = await db.execute(query)
+    bluf = result.scalar_one_or_none()
+
+    if not bluf:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="BLUF brief not found for this threat"
+        )
+    return bluf
+
+
+@router.get("/{threat_id}/analysis")
+async def get_threat_analysis(
+    threat_id: str,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Retrieve previously generated LLM analyses for a threat.
+    """
+    query = select(LLMAnalysis).where(LLMAnalysis.threat_id == threat_id).order_by(LLMAnalysis.generated_at.desc())
+    result = await db.execute(query)
+    analyses = result.scalars().all()
+    
+    return [
+        {
+            "id": a.id,
+            "threat_id": a.threat_id,
+            "model": a.model,
+            "prompt_version": a.prompt_version,
+            "generated_at": a.generated_at.isoformat(),
+            "analysis": a.output
+        } for a in analyses
+    ]
 
 
 @router.get("", response_model=List[ThreatRead])

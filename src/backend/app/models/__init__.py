@@ -10,6 +10,7 @@ from app.models.mitre import MitreTactic, MitreTechnique, ThreatMitreMapping
 from app.models.bluf import BlufReport
 from app.models.data_source import DataSource, DataSourceStatus
 from app.models.audit_log import AuditLog
+from app.models.llm_analysis import LLMAnalysis
 
 __all__ = [
     "Base",
@@ -36,4 +37,5 @@ __all__ = [
     "DataSource",
     "DataSourceStatus",
     "AuditLog",
+    "LLMAnalysis",
 ]

@@ -10,6 +10,7 @@ from app.api.intelligence import router as intelligence_router
 from app.api.mitre import router as mitre_router
 from app.api.bluf import router as bluf_router
 from app.api.data_sources import router as data_sources_router
+from app.api.ai import router as ai_router
 
 api_router = APIRouter()
 
@@ -24,3 +25,4 @@ api_router.include_router(mitre_router, prefix="/mitre", tags=["MITRE ATT&CK"])
 api_router.include_router(bluf_router, prefix="/bluf", tags=["BLUF Briefs"])
 api_router.include_router(bluf_router, prefix="/briefs", tags=["BLUF Briefs (Frontend Alias)"])
 api_router.include_router(data_sources_router, prefix="/data-sources", tags=["Data Sources"])
+api_router.include_router(ai_router, prefix="/ai", tags=["AI Analysis"])
