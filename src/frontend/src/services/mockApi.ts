@@ -1,5 +1,7 @@
 import type { Alert, TrendPoint, TrendRange } from '../types/alert'
+import type { Incident } from '../types/incident'
 import { mockAlerts, trendData } from '../data/mockAlerts'
+import { mockIncidents } from '../data/mockIncidents'
 
 /**
  * Frontend data-access layer.
@@ -32,6 +34,14 @@ export function fetchAlerts(): Promise<Alert[]> {
  */
 export function fetchTrend(range: TrendRange): Promise<TrendPoint[]> {
   return delay(trendData[range], 300)
+}
+
+/**
+ * GET /api/incidents
+ * Response: Incident[]
+ */
+export function fetchIncidents(): Promise<Incident[]> {
+  return delay(mockIncidents)
 }
 
 /** Convenience export so pages can map incident IDs to titles. */
