@@ -5,7 +5,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
-        env_file=".env",
+        env_file=(".env", "src/backend/.env"),
         env_file_encoding="utf-8",
         case_sensitive=False,
         extra="ignore"
@@ -52,6 +52,8 @@ class Settings(BaseSettings):
     @property
     def async_db_url(self) -> str:
         url = self.SUPABASE_DB_URL
+        if not url:
+            return "sqlite+aiosqlite:///:memory:"
         if url.startswith("postgresql://"):
             url = url.replace("postgresql://", "postgresql+asyncpg://", 1)
         elif url.startswith("postgres://"):
@@ -63,6 +65,8 @@ class Settings(BaseSettings):
         if self.DATABASE_URL_SYNC:
             return self.DATABASE_URL_SYNC
         url = self.SUPABASE_DB_URL
+        if not url:
+            return "sqlite:///:memory:"
         if url.startswith("postgresql+asyncpg://"):
             url = url.replace("postgresql+asyncpg://", "postgresql://", 1)
         return url
