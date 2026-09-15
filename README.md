@@ -10,8 +10,8 @@
 |---|---|
 | **Team Name** | threat-intelligence |
 | **Track** | AI |
-| **Team Lead** | sutariyadhruv20- 24dcs129@charusat.edu.in |
-| **Members** | Ayush5112006 — 24dcs139@charusat.edu.in |
+| **Team Lead** | Dhruv Sutariya - 24dcs129@charusat.edu.in |
+| **Members** | Ayush Thummar , Ankit Lakhatariya , JaynadSinh Gohil
 
 ---
 
