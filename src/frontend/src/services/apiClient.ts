@@ -376,3 +376,18 @@ export async function generateBluf(threatId: string) {
     method: 'POST',
   })
 }
+
+// ============================================================================
+// 9. AI / LLM Threat Analysis
+// ============================================================================
+
+export async function analyzeThreatAI(threatId: string) {
+  return request<any>(`/api/v1/ai/analyze-threat/${encodeURIComponent(threatId)}`, {
+    method: 'POST',
+  })
+}
+
+export async function getThreatAnalysisHistory(threatId: string) {
+  return request<any[]>(`/api/v1/threats/${encodeURIComponent(threatId)}/analysis`)
+}
+
