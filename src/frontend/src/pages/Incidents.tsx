@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Activity, ChevronDown, ChevronUp, GitBranch, Network, RotateCw, Search, ShieldAlert } from 'lucide-react'
-import { getThreats, getThreatAlerts } from '../services/apiClient'
+import { getAlerts, getThreatAlerts, getThreats } from '../services/apiClient'
 import { severityColors } from '../lib/chartTheme'
 import { SeverityBadge } from '../components/severity/SeverityBadge'
 
@@ -200,16 +200,32 @@ function IncidentCard({
   onToggle: () => void
 }) {
   const [relatedAlerts, setRelatedAlerts] = useState<any[]>([])
+  const alertIds = incident.alert_ids ?? incident.alertIds ?? []
+  const reportedAlertCount = incident.alert_count ?? incident.alertCount
+  const alertCount = relatedAlerts.length || (alertIds.length > 0 ? alertIds.length : reportedAlertCount ?? 0)
 
   useEffect(() => {
     if (expanded) {
       let active = true
-      getThreatAlerts(incident.id).then(data => {
-        if (active) setRelatedAlerts(data)
-      }).catch(() => {})
+      getThreatAlerts(incident.id)
+        .then(async (data) => {
+          if (data.length > 0) return data
+
+          const allAlerts = await getAlerts()
+          const ids = new Set(alertIds)
+          return allAlerts.filter((alert) =>
+            alert.related_threat_id === incident.id ||
+            alert.relatedThreatId === incident.id ||
+            ids.has(alert.id),
+          )
+        })
+        .then((data) => {
+          if (active) setRelatedAlerts(data)
+        })
+        .catch(() => {})
       return () => { active = false }
     }
-  }, [expanded, incident.id])
+  }, [alertIds, expanded, incident.id])
 
   const timeline = useMemo(() => {
     const events = [
@@ -253,7 +269,7 @@ function IncidentCard({
             <p className="text-[10px] uppercase tracking-wider">demo value</p>
           </div>
           <span className="rounded-lg border border-border bg-surface-2 px-2.5 py-1.5 text-xs font-semibold">
-            {incident.alert_ids?.length || 0} alerts
+            {alertCount} {alertCount === 1 ? 'alert' : 'alerts'}
           </span>
           <span className="flex h-8 w-8 items-center justify-center text-foreground-muted">
             {expanded ? (
@@ -368,22 +384,22 @@ function RelationshipDiagram({
   alerts: Array<{ id: string; severity: Severity }>
 }) {
   const visible = alerts.slice(0, 4)
-  const width = 320
+  const width = 640
   const centerX = width / 2
 
   return (
     <svg
-      viewBox={`0 0 ${width} 116`}
+      viewBox={`0 0 ${width} 180`}
       role="img"
       aria-label={`Relationship view: incident ${incidentId} linked to ${visible.length} sample alerts`}
-      className="mx-auto w-full max-w-md"
+      className="mx-auto h-48 w-full max-w-2xl"
     >
       <g stroke="var(--primary)" strokeWidth="1.6">
-        <path d="M 8 8 L 24 8 L 24 16 L 16 16 L 16 48 L 8 48 Z" fill="none" strokeLinejoin="round" />
+        <path d="M 18 18 L 38 18 L 38 28 L 28 28 L 28 58 L 18 58 Z" fill="none" strokeLinejoin="round" />
       </g>
-      <circle cx={centerX} cy="26" r="16" fill="var(--primary)" opacity="0.18" />
-      <circle cx={centerX} cy="26" r="16" fill="none" stroke="var(--primary)" strokeWidth="1.6" />
-      <text x={centerX} y="30" textAnchor="middle" fontSize="10" fontWeight="bold" fill="var(--foreground)">
+      <circle cx={centerX} cy="38" r="22" fill="var(--primary)" opacity="0.18" />
+      <circle cx={centerX} cy="38" r="22" fill="none" stroke="var(--primary)" strokeWidth="1.6" />
+      <text x={centerX} y="42" textAnchor="middle" fontSize="12" fontWeight="bold" fill="var(--foreground)">
         {incidentId}
       </text>
 
@@ -396,14 +412,14 @@ function RelationshipDiagram({
           <g key={alert.id}>
             <line
               x1={centerX}
-              y1="40"
+              y1="60"
               x2={alertX}
-              y2="78"
+              y2="102"
               stroke="var(--border)"
               strokeWidth="1.5"
             />
-            <circle cx={alertX} cy="92" r="10" fill={(severityColors as any)[alert.severity] || 'var(--primary)'} opacity="0.85" />
-            <text x={alertX} y="118" textAnchor="middle" fontSize="9" fill="var(--foreground-muted)">
+            <circle cx={alertX} cy="116" r="12" fill={(severityColors as any)[alert.severity] || 'var(--primary)'} opacity="0.85" />
+            <text x={alertX} y="146" textAnchor="middle" fontSize="11" fill="var(--foreground-muted)">
               {alert.id}
             </text>
           </g>
@@ -411,12 +427,12 @@ function RelationshipDiagram({
       })}
 
       {alerts.length === 0 && (
-        <text x={centerX} y="76" textAnchor="middle" fontSize="10" fill="var(--foreground-muted)">
+        <text x={centerX} y="96" textAnchor="middle" fontSize="11" fill="var(--foreground-muted)">
           No related sample alerts
         </text>
       )}
       {visible.length < alerts.length && (
-        <text x={centerX} y="112" textAnchor="middle" fontSize="9" fill="var(--foreground-muted)">
+        <text x={centerX} y="168" textAnchor="middle" fontSize="11" fill="var(--foreground-muted)">
           +{alerts.length - visible.length} more alerts
         </text>
       )}

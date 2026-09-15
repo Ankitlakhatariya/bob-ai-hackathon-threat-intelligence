@@ -6,7 +6,7 @@ Accepted platforms:
   - YouTube (public or unlisted)
   - Loom (https://www.loom.com/share/...)
   - IBM Box (https://ibm.box.com/s/...)
-  - Google Drive (set to "Anyone with the link can view")
+  - Google Drive :- https://drive.google.com/file/d/1-CZBjNfbVlkZupoM3rPGl1wcdLkDLCmP/view?usp=drivesdk
 
 Video requirements:
   - Length: 3–5 minutes maximum
