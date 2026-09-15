@@ -17,11 +17,11 @@ class Settings(BaseSettings):
     LOG_LEVEL: str = "INFO"
 
     # Supabase Configuration
-    SUPABASE_URL: str = "https://vxqrcffxhkvwlbastvus.supabase.co"
+    SUPABASE_URL: str = ""
     SUPABASE_ANON_KEY: str = ""
     SUPABASE_SERVICE_ROLE_KEY: str = ""
-    SUPABASE_DB_URL: str = "postgresql+asyncpg://postgres:Dhruv%40898689@db.vxqrcffxhkvwlbastvus.supabase.co:5432/postgres"
-    DATABASE_URL_SYNC: str = "postgresql://postgres:Dhruv%40898689@db.vxqrcffxhkvwlbastvus.supabase.co:5432/postgres"
+    SUPABASE_DB_URL: str = ""
+    DATABASE_URL_SYNC: str = ""
 
     # OpenAI Configuration
     OPENAI_API_KEY: Union[str, None] = None

@@ -1,3 +1,4 @@
+import uuid
 from datetime import datetime, timezone
 from typing import List, Tuple, Optional, Dict, Set
 from collections import defaultdict
@@ -244,9 +245,9 @@ class CorrelationEngine:
             primary_alert = sorted(comp_alerts, key=lambda a: a.risk_score, reverse=True)[0]
 
             if not threat:
-                count_res = await db.execute(select(func.count(Threat.id)))
-                total = count_res.scalar() or 0
-                new_tid = f"INC-{1000 + total + 1}"
+                # Use a UUID suffix to guarantee uniqueness across test runs.
+                # Count-based IDs collide when old test data remains in the shared DB.
+                new_tid = f"INC-{uuid.uuid4().hex[:8].upper()}"
 
                 threat = Threat(
                     id=new_tid,

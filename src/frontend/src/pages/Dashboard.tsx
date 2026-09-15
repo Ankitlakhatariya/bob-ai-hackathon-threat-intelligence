@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { AlertTriangle, ArrowRight, Bell, Network, RotateCw, ShieldAlert } from 'lucide-react'
 import {
@@ -14,7 +14,6 @@ import {
   YAxis,
 } from 'recharts'
 import type { SystemStatus, TrendPoint, TrendRange } from '../types/alert'
-import { computeSummary, severityDistribution } from '../lib/alertStats'
 import { chartColors, severityColors } from '../lib/chartTheme'
 import { getDashboardOverview, getAlertTrends, getSeverityDistribution, getRecentThreats } from '../services/apiClient'
 import { useThreatUpdates } from '../hooks/useThreatUpdates'
@@ -257,7 +256,7 @@ export function Dashboard() {
                     />
                     <Bar dataKey="count" name="Alerts" radius={[4, 4, 0, 0]}>
                       {distribution.map((entry) => (
-                        <Cell key={entry.severity} fill={severityColors[entry.severity]} />
+                        <Cell key={entry.severity} fill={(severityColors as any)[entry.severity] || 'var(--primary)'} />
                       ))}
                     </Bar>
                   </BarChart>
@@ -340,7 +339,7 @@ export function Dashboard() {
                   <div className="flex items-center gap-2.5">
                     <span
                       className="h-2.5 w-2.5 rounded-full"
-                      style={{ backgroundColor: healthColors[system.health] }}
+                      style={{ backgroundColor: (healthColors as any)[system.health] || 'var(--safe)' }}
                       aria-hidden="true"
                     />
                     <p className="text-sm font-semibold">{system.name}</p>

@@ -212,7 +212,7 @@ async def mark_investigation_false_positive(
 async def escalate_investigation(
     investigation_id: str,
     payload: Optional[InvestigationEscalateRequest] = None,
-    escalate_to: Optional[str] = Query(None, regex="^(P1|P2|P3|P4|CRITICAL|HIGH|MEDIUM|LOW)$"),
+    escalate_to: Optional[str] = Query(None, pattern="^(P1|P2|P3|P4|CRITICAL|HIGH|MEDIUM|LOW)$"),
     reason: Optional[str] = Query(None),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),

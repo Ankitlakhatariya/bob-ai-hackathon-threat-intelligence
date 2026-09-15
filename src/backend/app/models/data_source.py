@@ -22,7 +22,7 @@ class DataSource(Base, TimestampMixin):
     source_type: Mapped[str] = mapped_column(String(64), default="sensor", nullable=False)
     detail: Mapped[str] = mapped_column(String(255), nullable=False)
     health: Mapped[DataSourceStatus] = mapped_column(
-        SQLEnum(DataSourceStatus, name="data_source_status_enum", values_callable=lambda x: [e.value for e in x]),
+        SQLEnum(DataSourceStatus, native_enum=False, name="data_source_status_enum", values_callable=lambda x: [e.value for e in x]),
         default=DataSourceStatus.HEALTHY,
         nullable=False,
     )

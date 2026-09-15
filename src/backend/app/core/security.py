@@ -37,18 +37,29 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
 
 
 def create_access_token(
-    subject: str,
-    role: UserRole,
-    email: str,
+    subject: Optional[str] = None,
+    role: Optional[Union[UserRole, str]] = None,
+    email: Optional[str] = None,
     expires_delta: Optional[timedelta] = None,
     extra_claims: Optional[Dict[str, Any]] = None,
+    data: Optional[Dict[str, Any]] = None,
 ) -> str:
     """Creates a signed JWT access token with role and subject."""
+    if data:
+        subject = subject or str(data.get("sub") or data.get("subject") or "")
+        role = role or data.get("role") or UserRole.ANALYST
+        email = email or data.get("email") or ""
+        claims = {k: v for k, v in data.items() if k not in ("sub", "subject", "role", "email")}
+        if extra_claims:
+            claims.update(extra_claims)
+        extra_claims = claims
+
+    role_val = role.value if isinstance(role, UserRole) else str(role or "ANALYST")
     expire = datetime.now(timezone.utc) + (expires_delta or timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES))
     to_encode = {
-        "sub": subject,
-        "email": email,
-        "role": role.value,
+        "sub": subject or "",
+        "email": email or "",
+        "role": role_val,
         "exp": expire,
         "iat": datetime.now(timezone.utc),
         "type": "access",

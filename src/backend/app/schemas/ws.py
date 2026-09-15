@@ -7,6 +7,7 @@ from app.models.threat import ThreatSeverity, ThreatStatus
 
 class BaseWSEvent(BaseModel):
     event_type: str
+    event: Optional[str] = None
     timestamp: datetime
 
 
@@ -27,6 +28,7 @@ class AlertWSEvent(BaseWSEvent):
 class ThreatWSData(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     
+    id: Optional[str] = None
     threat_id: str
     title: str
     severity: ThreatSeverity

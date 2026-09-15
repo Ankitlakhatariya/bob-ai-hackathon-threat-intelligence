@@ -377,8 +377,11 @@ async def log_requests(request: Request, call_next):
 @app.exception_handler(StarletteHTTPException)
 async def http_exception_handler(request: Request, exc: StarletteHTTPException):
     detail = exc.detail
-    if isinstance(detail, dict) and "error" in detail:
-        error_body = detail
+    if isinstance(detail, dict):
+        if "error" in detail:
+            error_body = detail
+        else:
+            error_body = {"error": detail}
     else:
         error_body = {
             "error": {
@@ -386,7 +389,7 @@ async def http_exception_handler(request: Request, exc: StarletteHTTPException):
                 "message": str(detail),
             }
         }
-    return JSONResponse(status_code=exc.status_code, content=error_body)
+    return JSONResponse(status_code=exc.status_code, content=error_body, headers=getattr(exc, "headers", None))
 
 
 @app.exception_handler(RequestValidationError)

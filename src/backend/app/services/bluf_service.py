@@ -165,10 +165,10 @@ class BlufService:
 
         return {
             r.threat_id: {
-                "bottomLine": r.bottom_line,
+                "bottom_line": r.bottom_line,
                 "impact": r.impact,
-                "keyEvidence": r.key_evidence,
-                "recommendedFocus": r.recommended_focus,
+                "key_evidence": r.key_evidence,
+                "recommended_focus": r.recommended_focus,
             }
             for r in reports
         }

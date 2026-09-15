@@ -1,4 +1,5 @@
 import pytest
+import uuid
 from httpx import AsyncClient
 from datetime import datetime, timezone, timedelta
 from app.models.alert import Alert, AlertSeverity, AlertSource, AlertStatus
@@ -151,10 +152,15 @@ async def test_get_threat_details_and_timeline(async_client: AsyncClient):
 @pytest.mark.asyncio
 async def test_get_related_alerts_endpoint(async_client: AsyncClient):
     """Test GET /api/v1/alerts/{id}/related with explainable reason."""
+    # Use unique IDs each run to avoid PK collision on the shared Supabase DB
+    suffix = uuid.uuid4().hex[:8].upper()
+    a1_id = f"ALERT-CORR-{suffix}-1"
+    a2_id = f"ALERT-CORR-{suffix}-2"
+
     # First ingest two related alerts
     now = datetime.now(timezone.utc)
     a1_payload = {
-        "id": "ALERT-CORR-01",
+        "id": a1_id,
         "source": "siem",
         "title": "Brute force login detected",
         "hostname": "finance-vault",
@@ -164,7 +170,7 @@ async def test_get_related_alerts_endpoint(async_client: AsyncClient):
         "severity": "high",
     }
     a2_payload = {
-        "id": "ALERT-CORR-02",
+        "id": a2_id,
         "source": "edr",
         "title": "Privilege escalation tool executed",
         "hostname": "finance-vault",
@@ -180,7 +186,7 @@ async def test_get_related_alerts_endpoint(async_client: AsyncClient):
     await async_client.post("/api/v1/threats/correlate")
 
     # Check related endpoint
-    rel_res = await async_client.get("/api/v1/alerts/ALERT-CORR-01/related")
+    rel_res = await async_client.get(f"/api/v1/alerts/{a1_id}/related")
     assert rel_res.status_code == 200
     related_list = rel_res.json()
     assert isinstance(related_list, list)

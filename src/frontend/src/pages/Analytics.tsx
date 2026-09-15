@@ -20,7 +20,7 @@ import {
   YAxis,
 } from 'recharts'
 import type { AlertStatus, TrendPoint, TrendRange } from '../types/alert'
-import type { Incident, IncidentStatus } from '../types/incident'
+import type { IncidentStatus } from '../types/incident'
 import { computeSummary, severityDistribution } from '../lib/alertStats'
 import { chartColors, incidentStatusColors, severityColors, statusColors } from '../lib/chartTheme'
 import { getThreats, getAlertTrends, getAlerts } from '../services/apiClient'

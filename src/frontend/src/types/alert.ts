@@ -2,8 +2,7 @@
  * Alert data contracts.
  *
  * These types define the shape of alert data used across the frontend and are
- * the expected contract for the future backend API. Mock sources in
- * `src/data/mockAlerts.ts` implement them today.
+ * the expected contract for the backend API.
  */
 
 export type Severity = 'critical' | 'high' | 'medium' | 'low'
@@ -16,24 +15,35 @@ export type AlertSource = 'siem' | 'edr' | 'network-sensor' | 'threat-feed'
 export interface Alert {
   /** Stable identifier, e.g. "ALERT-2041". */
   id: string
-  teamId: string
+  teamId?: string
+  team_id?: string
   title: string
   description: string
   source: AlertSource
   /** Human-readable source label, e.g. "EDR Endpoint Agent". */
-  sourceLabel: string
+  sourceLabel?: string
+  source_label?: string
   /** ISO 8601 timestamp of first detection. */
   timestamp: string
   severity: Severity
   status: AlertStatus
-  /** 0–100 risk score; higher = more urgent. Demo-derived, not from a real model. */
+  /** 0–100 risk score; higher = more urgent. */
   riskScore: number
+  risk_score?: number
   /** Incident this alert is correlated into, if any. */
-  relatedIncidentId: string | null
-  /** MITRE ATT&CK technique IDs. Mappings are demo data until the AI/backend team provides results. */
-  mitreTechniques: string[]
-  /** Sample indicators (addresses/hashes). Uses reserved, non-routable example values only. */
+  relatedIncidentId?: string | null
+  related_threat_id?: string | null
+  /** MITRE ATT&CK technique IDs. */
+  mitreTechniques?: string[]
+  mitre_techniques?: string[]
+  /** Sample indicators (addresses/hashes). */
   indicators: string[]
+  rawData?: any
+  raw_data?: any
+  hostname?: string
+  username?: string
+  source_ip?: string
+  destination_ip?: string
 }
 
 export type TrendRange = '24h' | '7d' | '30d'
@@ -49,6 +59,9 @@ export interface DashboardSummary {
   critical: number
   incidentCount: number
   falsePositiveReview: number
+  total_open?: number
+  false_positive_review?: number
+  incident_count?: number
 }
 
 export interface SystemStatus {
@@ -59,8 +72,7 @@ export interface SystemStatus {
 }
 
 /**
- * Envelope a future REST API should return for list endpoints.
- * Kept as the documented contract; mock services return data directly.
+ * Envelope a REST API returns for list endpoints.
  */
 export interface ListEnvelope<T> {
   items: T[]
@@ -70,8 +82,7 @@ export interface ListEnvelope<T> {
 }
 
 /**
- * Error shape a future REST API should return for failures.
- * Kept as the documented contract for the backend team.
+ * Error shape a REST API returns for failures.
  */
 export interface ApiErrorBody {
   error: {

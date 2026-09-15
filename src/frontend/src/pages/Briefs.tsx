@@ -2,7 +2,6 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Activity, Check, ClipboardList, Copy, FileText, Printer, RotateCw, ShieldAlert } from 'lucide-react'
 import type { Severity } from '../types/alert'
-import type { Incident } from '../types/incident'
 import { getThreats, getBlufReports, getThreatAlerts } from '../services/apiClient'
 import { SeverityBadge } from '../components/severity/SeverityBadge'
 
@@ -56,9 +55,9 @@ export function Briefs() {
   const sorted = useMemo(() => {
     if (!incidents) return []
     return [...incidents].sort((a, b) => {
-      const pa = priorityOrder[priorityOf[a.severity].level]
-      const pb = priorityOrder[priorityOf[b.severity].level]
-      return pa - pb || new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
+      const pa = priorityOrder[((priorityOf as any)[a.severity] || priorityOf.medium).level]
+      const pb = priorityOrder[((priorityOf as any)[b.severity] || priorityOf.medium).level]
+      return pa - pb || new Date(b.updatedAt || b.updated_at || b.openedAt).getTime() - new Date(a.updatedAt || a.updated_at || a.openedAt).getTime()
     })
   }, [incidents])
 
@@ -158,10 +157,10 @@ function BriefCard({ incident, brief }: { incident: any; brief: any }) {
     return events.sort((a, b) => new Date(a.time).getTime() - new Date(b.time).getTime())
   }, [incident, relatedAlerts])
 
-  const priority = priorityOf[incident.severity]
+  const priority = (priorityOf as any)[incident.severity] || priorityOf.medium
 
-  const evidence =
-    brief?.keyEvidence ?? relatedAlerts.map((alert) => `${alert.id} — ${alert.title}`)
+  const evidence: string[] =
+    brief?.keyEvidence ?? brief?.key_evidence ?? relatedAlerts.map((alert) => `${alert.id} — ${alert.title}`)
 
   async function copyBrief() {
     const text = [
@@ -173,7 +172,7 @@ function BriefCard({ incident, brief }: { incident: any; brief: any }) {
       `Impact: ${brief?.impact ?? 'See incident summary (demo).'}`,
       '',
       'Key evidence:',
-      ...evidence.map((item) => `- ${item}`),
+      ...evidence.map((item: string) => `- ${item}`),
       '',
       `Recommended investigation focus: ${brief?.recommended_focus || brief?.recommendedFocus || 'Open the incident view and review the related sample alerts.'}`,
       `Related alerts: ${relatedAlerts.map((alert) => alert.id).join(', ') || 'none'}`,
@@ -250,7 +249,7 @@ function BriefCard({ incident, brief }: { incident: any; brief: any }) {
               Key evidence
             </h3>
             <ul className="mt-2 space-y-1.5">
-              {evidence.map((item) => (
+              {evidence.map((item: string) => (
                 <li key={item} className="flex items-start gap-1.5 text-sm leading-relaxed text-foreground-muted">
                   <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-primary" aria-hidden="true" />
                   {item}

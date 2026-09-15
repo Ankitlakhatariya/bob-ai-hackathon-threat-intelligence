@@ -36,3 +36,6 @@ class ThreatMitreMappingRead(BaseModel):
     evidence: str
     source: str
     created_at: Optional[datetime] = Field(default=None, serialization_alias="createdAt")
+
+
+ThreatMitreRead = ThreatMitreMappingRead

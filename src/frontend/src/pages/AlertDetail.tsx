@@ -139,7 +139,7 @@ export function AlertDetail() {
     window.setTimeout(() => setSaved(false), 1800)
   }
 
-  if (loading || alerts === null) {
+  if (loading || alert === null) {
     return <AlertDetailSkeleton />
   }
 
@@ -225,7 +225,7 @@ export function AlertDetail() {
                     className="h-full rounded-full"
                     style={{
                       width: `${alert.risk_score || alert.riskScore}%`,
-                      backgroundColor: riskTone[alert.severity],
+                      backgroundColor: riskTone[alert.severity as keyof typeof riskTone] || 'var(--medium)',
                     }}
                   />
                 </div>

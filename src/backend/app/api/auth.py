@@ -46,6 +46,7 @@ async def register(payload: UserRegisterRequest, db: AsyncSession = Depends(get_
         full_name=payload.full_name or payload.email.split("@")[0],
         role=payload.role,
         is_active=True,
+        # supabase_id is intentionally NULL for locally-registered users
     )
     db.add(user)
     await db.commit()

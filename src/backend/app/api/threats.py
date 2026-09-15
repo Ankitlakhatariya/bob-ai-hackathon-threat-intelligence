@@ -20,7 +20,7 @@ from app.schemas.threat import (
 from app.schemas.alert import AlertRead
 from app.schemas.bluf import BlufReportResponse
 from app.schemas.correlation import CorrelationResult
-from app.schemas.mitre import MitreTechniqueRead
+from app.schemas.mitre import MitreTechniqueRead, ThreatMitreMappingRead
 from app.services.correlation import CorrelationEngine
 from app.services.threat_scoring import ThreatScoringEngine
 from app.core.rate_limit import bulk_ingest_rate_limiter
@@ -30,7 +30,7 @@ router = APIRouter()
 
 @router.get("/prioritized", response_model=List[ThreatRead])
 async def get_prioritized_threats(
-    priority: Optional[str] = Query(None, regex="^(CRITICAL|HIGH|MEDIUM|LOW)$"),
+    priority: Optional[str] = Query(None, pattern="^(CRITICAL|HIGH|MEDIUM|LOW)$"),
     min_score: Optional[int] = Query(None, ge=0, le=100),
     status: Optional[str] = Query(None, description="active, investigating, resolved"),
     skip: int = Query(0, ge=0),
@@ -123,8 +123,8 @@ async def get_threats(
     status: Optional[str] = Query(None, description="active, investigating, resolved"),
     severity: Optional[str] = Query(None, description="critical, high, medium, low"),
     search: Optional[str] = Query(None, description="Search ID, title, or summary"),
-    sort_by: str = Query("first_seen", regex="^(first_seen|last_seen|risk_score|confidence|alert_count|id)$"),
-    sort_order: str = Query("desc", regex="^(desc|asc)$"),
+    sort_by: str = Query("first_seen", pattern="^(first_seen|last_seen|risk_score|confidence|alert_count|id)$"),
+    sort_order: str = Query("desc", pattern="^(desc|asc)$"),
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=500),
     db: AsyncSession = Depends(get_db),

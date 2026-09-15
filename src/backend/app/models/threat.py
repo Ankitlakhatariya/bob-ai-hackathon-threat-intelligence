@@ -1,8 +1,8 @@
 from datetime import datetime, timezone
 from enum import Enum
-from typing import List, Optional
+from typing import List, Optional, Any
 from sqlalchemy import String, Text, Integer, DateTime, Enum as SQLEnum, Index
-from sqlalchemy.dialects.postgresql import ARRAY
+from sqlalchemy.dialects.postgresql import ARRAY, JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.database.database import Base, TimestampMixin
 
@@ -31,13 +31,13 @@ class Threat(Base, TimestampMixin):
     description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     explanation: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     severity: Mapped[ThreatSeverity] = mapped_column(
-        SQLEnum(ThreatSeverity, name="threat_severity_enum", values_callable=lambda x: [e.value for e in x]),
+        SQLEnum(ThreatSeverity, native_enum=False, name="threat_severity_enum", values_callable=lambda x: [e.value for e in x]),
         default=ThreatSeverity.MEDIUM,
         nullable=False,
         index=True,
     )
     status: Mapped[ThreatStatus] = mapped_column(
-        SQLEnum(ThreatStatus, name="threat_status_enum", values_callable=lambda x: [e.value for e in x]),
+        SQLEnum(ThreatStatus, native_enum=False, name="threat_status_enum", values_callable=lambda x: [e.value for e in x]),
         default=ThreatStatus.ACTIVE,
         nullable=False,
         index=True,

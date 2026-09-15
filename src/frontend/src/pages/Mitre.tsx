@@ -4,7 +4,11 @@ import { ExternalLink, RotateCw, Search, ShieldAlert, Target } from 'lucide-reac
 import { getMitreTechniques, getAlerts, getThreats } from '../services/apiClient'
 import { SeverityBadge } from '../components/severity/SeverityBadge'
 
+import type { Alert } from '../types/alert'
+import type { Incident } from '../types/incident'
+
 type MitreTactic = string
+type TacticFilter = 'all' | MitreTactic
 
 const tacticOptions = [
   'Initial Access',
@@ -243,7 +247,7 @@ export function Mitre() {
                     </span>
                   </div>
                   <div className="mt-3 flex flex-wrap gap-1.5">
-                    {technique.tactics.map((item) => (
+                    {technique.tactics.map((item: string) => (
                       <span
                         key={item}
                         className="rounded-full border border-border bg-surface-2 px-2 py-0.5 text-[11px] text-foreground-muted"
@@ -312,7 +316,7 @@ function TechniqueDetail({
       </div>
 
       <div className="mt-3 flex flex-wrap gap-1.5">
-        {technique.tactics.map((item) => (
+        {technique.tactics.map((item: string) => (
           <span
             key={item}
             className="rounded-full border border-primary/40 bg-primary/10 px-2.5 py-0.5 text-xs font-semibold text-primary"

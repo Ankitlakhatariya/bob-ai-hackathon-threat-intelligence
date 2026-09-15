@@ -40,7 +40,7 @@ class InvestigationService:
                     "action": "CREATED",
                     "timestamp": datetime.now(timezone.utc).isoformat(),
                     "actor": user_id or assigned or "System",
-                    "note": f"Investigation opened with priority {payload.priority.value if payload.priority else 'P2'}",
+                    "note": f"Investigation opened with priority {payload.priority.value if hasattr(payload.priority, 'value') else (payload.priority or 'P2')}",
                 }
             ],
         )
@@ -71,7 +71,7 @@ class InvestigationService:
                 "title": case.title,
                 "threat_id": case.threat_id,
                 "alert_id": case.alert_id,
-                "priority": case.priority.value,
+                "priority": case.priority.value if hasattr(case.priority, "value") else str(case.priority),
                 "assigned_analyst": case.assigned_to,
             },
         )
@@ -153,7 +153,7 @@ class InvestigationService:
         if payload.status is not None:
             old_status = case.status
             case.status = payload.status
-            updated_fields["status"] = payload.status.value
+            updated_fields["status"] = payload.status.value if hasattr(payload.status, "value") else str(payload.status)
             if payload.status in [InvestigationStatus.RESOLVED, InvestigationStatus.CLOSED, InvestigationStatus.FALSE_POSITIVE]:
                 if not case.closed_at:
                     case.closed_at = datetime.now(timezone.utc)
@@ -162,7 +162,7 @@ class InvestigationService:
 
         if payload.priority is not None:
             case.priority = payload.priority
-            updated_fields["priority"] = payload.priority.value
+            updated_fields["priority"] = payload.priority.value if hasattr(payload.priority, "value") else str(payload.priority)
         assigned = payload.assigned_analyst or payload.assigned_to
         if assigned is not None:
             case.assigned_to = assigned

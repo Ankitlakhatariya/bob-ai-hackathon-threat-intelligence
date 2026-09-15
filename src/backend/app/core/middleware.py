@@ -26,7 +26,7 @@ class RequestSizeLimitMiddleware:
             try:
                 if int(content_length) > self.max_body_size:
                     response = JSONResponse(
-                        status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                        status_code=status.HTTP_413_CONTENT_TOO_LARGE,
                         content={"error": {"code": "PAYLOAD_TOO_LARGE", "message": f"Request body exceeds the {self.max_body_size} bytes limit."}}
                     )
                     await response(scope, receive, send)
@@ -50,7 +50,7 @@ class RequestSizeLimitMiddleware:
         except RuntimeError as e:
             if str(e) == "Request body too large":
                 response = JSONResponse(
-                    status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                    status_code=status.HTTP_413_CONTENT_TOO_LARGE,
                     content={"error": {"code": "PAYLOAD_TOO_LARGE", "message": f"Request body exceeded the {self.max_body_size} bytes limit during streaming."}}
                 )
                 try:

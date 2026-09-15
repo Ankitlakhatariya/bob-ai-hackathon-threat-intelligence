@@ -3,14 +3,14 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
-from app.database.session import get_db
+from app.core.dependencies import get_db
 from app.models.threat import Threat
 from app.models.alert import Alert
 from app.models.llm_analysis import LLMAnalysis
 from app.models.bluf import BlufReport
 from app.services.llm_service import OpenAIThreatAnalysisService
 from app.schemas.llm import ThreatAnalysisResponse
-from app.schemas.bluf import BlufReportCreate, BlufReportResponse
+from app.schemas.bluf import BlufReportResponse
 from app.core.rate_limit import llm_rate_limiter
 
 router = APIRouter()

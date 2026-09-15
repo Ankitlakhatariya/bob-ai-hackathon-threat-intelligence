@@ -37,7 +37,7 @@ class Alert(Base, TimestampMixin):
     title: Mapped[str] = mapped_column(String(255), nullable=False)
     description: Mapped[str] = mapped_column(Text, nullable=False)
     source: Mapped[AlertSource] = mapped_column(
-        SQLEnum(AlertSource, name="alert_source_enum", values_callable=lambda x: [e.value for e in x]),
+        SQLEnum(AlertSource, native_enum=False, name="alert_source_enum", values_callable=lambda x: [e.value for e in x]),
         nullable=False,
         index=True,
     )
@@ -49,12 +49,12 @@ class Alert(Base, TimestampMixin):
         index=True,
     )
     severity: Mapped[AlertSeverity] = mapped_column(
-        SQLEnum(AlertSeverity, name="alert_severity_enum", values_callable=lambda x: [e.value for e in x]),
+        SQLEnum(AlertSeverity, native_enum=False, name="alert_severity_enum", values_callable=lambda x: [e.value for e in x]),
         nullable=False,
         index=True,
     )
     status: Mapped[AlertStatus] = mapped_column(
-        SQLEnum(AlertStatus, name="alert_status_enum", values_callable=lambda x: [e.value for e in x]),
+        SQLEnum(AlertStatus, native_enum=False, name="alert_status_enum", values_callable=lambda x: [e.value for e in x]),
         default=AlertStatus.OPEN,
         nullable=False,
         index=True,

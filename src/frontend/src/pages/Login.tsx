@@ -16,7 +16,7 @@ import {
 } from 'lucide-react'
 import { ThreatLensLogo } from '../components/logo/ThreatLensLogo'
 import { useTheme } from '../components/theme/ThemeProvider'
-import { login, getAuthMe, ApiError } from '../services/apiClient'
+import { login, getAuthMe } from '../services/apiClient'
 import { setTokens, setAuthSession } from '../lib/authSession'
 
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/

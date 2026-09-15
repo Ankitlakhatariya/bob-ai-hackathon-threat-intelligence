@@ -35,8 +35,8 @@ async def get_alerts(
     start_date: Optional[datetime] = Query(None, description="Filter alerts after timestamp"),
     end_date: Optional[datetime] = Query(None, description="Filter alerts before timestamp"),
     search: Optional[str] = Query(None, description="Free text search on ID, title, description, host, IP"),
-    sort_by: str = Query("timestamp", regex="^(timestamp|risk_score|severity|id)$"),
-    sort_order: str = Query("desc", regex="^(desc|asc)$"),
+    sort_by: str = Query("timestamp", pattern="^(timestamp|risk_score|severity|id)$"),
+    sort_order: str = Query("desc", pattern="^(desc|asc)$"),
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=500),
     db: AsyncSession = Depends(get_db),
@@ -124,7 +124,7 @@ async def get_alerts(
 
 @router.get("/trend", response_model=List[TrendPointResponse])
 async def get_alert_trend(
-    range: str = Query("24h", regex="^(24h|7d|30d)$"),
+    range: str = Query("24h", pattern="^(24h|7d|30d)$"),
     db: AsyncSession = Depends(get_db),
 ):
     """Returns trend volume of alerts and correlated incidents over time (24h, 7d, 30d)."""

@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useState } from 'react'
 import type { Alert } from '../types/alert'
-import { getAlerts, ApiError } from '../services/apiClient'
+import { getAlerts } from '../services/apiClient'
 
 export function useAlerts(params?: Record<string, string>) {
-  const [alerts, setAlerts] = useState<any[] | null>(null)
+  const [alerts, setAlerts] = useState<Alert[] | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [attempt, setAttempt] = useState(0)
 

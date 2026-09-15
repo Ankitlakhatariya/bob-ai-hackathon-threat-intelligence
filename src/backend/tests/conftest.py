@@ -88,6 +88,7 @@ def mock_alert():
     return Alert(
         id=f"ALERT-{uuid.uuid4()}",
         source=AlertSource.EDR,
+        source_label="CrowdStrike Falcon EDR",
         title="Suspicious Process Execution",
         description="powershell.exe downloading payload",
         severity=AlertSeverity.HIGH,
@@ -96,7 +97,6 @@ def mock_alert():
         timestamp=datetime.now(timezone.utc),
         hostname="WORKSTATION-01",
         username="jdoe",
-        process_name="powershell.exe",
         indicators=["198.51.100.12"]
     )
 
@@ -139,8 +139,11 @@ def mock_llm_service():
         with patch("app.api.ai.llm_service.is_configured", return_value=True):
             yield mock_analyze
 
-@pytest.fixture(autouse=True)
+@pytest.fixture
 def mock_threat_intel():
-    """Automatically mock External Threat Intel to prevent real network calls."""
+    """Mock External Threat Intel to prevent real network calls.
+    Apply this fixture explicitly to tests that need mocked intel lookups.
+    NOT autouse — test_unconfigured_external_provider_does_not_fabricate must use the real implementation.
+    """
     with patch("app.services.intelligence.provider.ExternalThreatIntelProvider.lookup", new_callable=AsyncMock) as mock_lookup:
         yield mock_lookup

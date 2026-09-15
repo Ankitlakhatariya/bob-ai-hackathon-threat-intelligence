@@ -22,24 +22,29 @@ from app.services.investigation_service import InvestigationService
 
 @pytest.fixture
 async def db_session():
-    """In-memory SQLite database session for unit testing."""
-    engine = create_async_engine("sqlite+aiosqlite:///:memory:", echo=False)
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-
-    async_session = async_sessionmaker(engine, expire_on_commit=False, class_=AsyncSession)
-    async with async_session() as session:
+    """Database session using the configured database."""
+    from app.database.session import AsyncSessionLocal
+    async with AsyncSessionLocal() as session:
         yield session
-
-    await engine.dispose()
 
 
 @pytest.mark.asyncio
 async def test_create_investigation(db_session: AsyncSession):
     """Test investigation creation and audit log generation."""
+    t_id = f"THREAT-{uuid.uuid4().hex[:8]}"
+    threat = Threat(
+        id=t_id,
+        title="Suspicious C2 Beaconing",
+        summary="C2 beaconing detected",
+        severity=ThreatSeverity.HIGH,
+        status=ThreatStatus.ACTIVE,
+    )
+    db_session.add(threat)
+    await db_session.commit()
+
     payload = InvestigationCreate(
         title="Suspicious C2 Beaconing Investigation",
-        threat_id="THREAT-5001",
+        threat_id=t_id,
         assigned_analyst="analyst.alice@threatlens.soc",
         priority=InvestigationPriority.P1,
         notes="Detected multiple outbound beacons to suspect dynamic DNS domain.",
@@ -70,8 +75,19 @@ async def test_create_investigation(db_session: AsyncSession):
 @pytest.mark.asyncio
 async def test_add_investigation_note(db_session: AsyncSession):
     """Test adding sequential analyst notes to the case history."""
+    t_id = f"THREAT-{uuid.uuid4().hex[:8]}"
+    threat = Threat(
+        id=t_id,
+        title="Test Investigation Note Campaign",
+        summary="Testing notes",
+        severity=ThreatSeverity.MEDIUM,
+        status=ThreatStatus.ACTIVE,
+    )
+    db_session.add(threat)
+    await db_session.commit()
+
     payload = InvestigationCreate(
-        threat_id="THREAT-5002",
+        threat_id=t_id,
         assigned_analyst="analyst.bob@threatlens.soc",
         priority=InvestigationPriority.P2,
     )
@@ -102,9 +118,9 @@ async def test_add_investigation_note(db_session: AsyncSession):
 @pytest.mark.asyncio
 async def test_resolve_investigation(db_session: AsyncSession):
     """Test resolving an investigation, verifying threat state transition and timestamp."""
-    # Seed threat
+    t_id = f"THREAT-{uuid.uuid4().hex[:8]}"
     threat = Threat(
-        id="THREAT-6001",
+        id=t_id,
         title="Kerberoasting Activity",
         summary="Service ticket requests detected",
         severity=ThreatSeverity.HIGH,
@@ -115,7 +131,7 @@ async def test_resolve_investigation(db_session: AsyncSession):
 
     # Create investigation
     payload = InvestigationCreate(
-        threat_id="THREAT-6001",
+        threat_id=t_id,
         assigned_analyst="analyst.charlie@threatlens.soc",
     )
     case = await InvestigationService.create_investigation(db=db_session, payload=payload)
@@ -145,15 +161,16 @@ async def test_mark_false_positive_preserves_evidence(db_session: AsyncSession):
     2. NEVER deletes raw alert telemetry, event logs, or correlation linkages
     3. Explicitly records evidence preservation in audit trail
     """
-    # Seed alert with rich raw data and telemetry
+    a_id = f"ALERT-{uuid.uuid4().hex[:8]}"
     alert = Alert(
-        id="ALERT-9001",
+        id=a_id,
         title="PowerShell Encoded Command",
         description="powershell.exe -EncodedCommand ...",
         source=AlertSource.EDR,
         source_label="CrowdStrike Falcon",
         severity=AlertSeverity.HIGH,
         status=AlertStatus.OPEN,
+        risk_score=75,
         raw_data={"cmdline": "powershell.exe -EncodedCommand dGVzdA==", "user": "SYSTEM"},
         indicators=["192.168.1.100"],
     )
@@ -162,8 +179,8 @@ async def test_mark_false_positive_preserves_evidence(db_session: AsyncSession):
 
     # Create investigation for this alert
     payload = InvestigationCreate(
-        alert_id="ALERT-9001",
-        title="Investigation on Alert-9001",
+        alert_id=a_id,
+        title=f"Investigation on {a_id}",
         assigned_analyst="analyst.david@threatlens.soc",
     )
     case = await InvestigationService.create_investigation(db=db_session, payload=payload)
@@ -184,7 +201,7 @@ async def test_mark_false_positive_preserves_evidence(db_session: AsyncSession):
 
     # EVIDENCE PRESERVATION ASSERTIONS:
     # 1. Alert must still exist in DB (NOT deleted)
-    retrieved_alert = await db_session.get(Alert, "ALERT-9001")
+    retrieved_alert = await db_session.get(Alert, a_id)
     assert retrieved_alert is not None
     assert retrieved_alert.status == AlertStatus.FALSE_POSITIVE
     # 2. Raw data and indicators must remain intact
@@ -206,8 +223,19 @@ async def test_mark_false_positive_preserves_evidence(db_session: AsyncSession):
 @pytest.mark.asyncio
 async def test_escalate_investigation(db_session: AsyncSession):
     """Test escalating investigation priority and setting ESCALATED status."""
+    t_id = f"THREAT-{uuid.uuid4().hex[:8]}"
+    threat = Threat(
+        id=t_id,
+        title="Escalation Test Threat",
+        summary="Testing escalation",
+        severity=ThreatSeverity.MEDIUM,
+        status=ThreatStatus.ACTIVE,
+    )
+    db_session.add(threat)
+    await db_session.commit()
+
     payload = InvestigationCreate(
-        threat_id="THREAT-7001",
+        threat_id=t_id,
         priority=InvestigationPriority.P3,
         assigned_analyst="analyst.eve@threatlens.soc",
     )

@@ -20,7 +20,7 @@ class User(Base, TimestampMixin):
     hashed_password: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     full_name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     role: Mapped[UserRole] = mapped_column(
-        SQLEnum(UserRole, name="user_role_enum", values_callable=lambda x: [e.value for e in x]),
+        SQLEnum(UserRole, native_enum=False, name="user_role_enum", values_callable=lambda x: [e.value for e in x]),
         default=UserRole.ANALYST,
         nullable=False,
     )

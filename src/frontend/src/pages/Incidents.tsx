@@ -5,6 +5,9 @@ import { getThreats, getThreatAlerts } from '../services/apiClient'
 import { severityColors } from '../lib/chartTheme'
 import { SeverityBadge } from '../components/severity/SeverityBadge'
 
+import type { Severity } from '../types/alert'
+import type { IncidentStatus } from '../types/incident'
+
 type StatusFilter = 'all' | IncidentStatus
 type SeverityFilter = 'all' | Severity
 
@@ -233,9 +236,9 @@ function IncidentCard({
             <span className="font-mono text-xs text-foreground-muted">{incident.id}</span>
             <SeverityBadge severity={incident.severity} />
             <span
-              className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-semibold ${incidentStatusStyles[incident.status]}`}
+              className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-semibold ${(incidentStatusStyles as any)[incident.status] || ''}`}
             >
-              {incidentStatusLabels[incident.status]}
+              {(incidentStatusLabels as any)[incident.status] || incident.status}
             </span>
           </div>
           <h2 className="mt-2 text-base font-semibold">{incident.title}</h2>
@@ -399,7 +402,7 @@ function RelationshipDiagram({
               stroke="var(--border)"
               strokeWidth="1.5"
             />
-            <circle cx={alertX} cy="92" r="10" fill={severityColors[alert.severity]} opacity="0.85" />
+            <circle cx={alertX} cy="92" r="10" fill={(severityColors as any)[alert.severity] || 'var(--primary)'} opacity="0.85" />
             <text x={alertX} y="118" textAnchor="middle" fontSize="9" fill="var(--foreground-muted)">
               {alert.id}
             </text>

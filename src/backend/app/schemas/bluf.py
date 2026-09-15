@@ -19,3 +19,6 @@ class BlufReportRead(BaseModel):
 class BlufGenerateRequest(BaseModel):
     threat_id: str
     include_timeline: bool = True
+
+
+BlufReportResponse = BlufReportRead

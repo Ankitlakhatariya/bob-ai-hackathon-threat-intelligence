@@ -93,7 +93,7 @@ async def test_generate_bluf_endpoint(db_session, mock_threat):
             # Set up the mock response from LLM
             mock_analyze.return_value = ThreatAnalysisResponse(
                 assessment="Severe threat detected.",
-                confidence=95.0,
+                confidence=0.95,
                 key_findings=["Finding 1"],
                 evidence=["Evidence 1"],
                 potential_attack_chain=["Step 1"],
@@ -105,10 +105,13 @@ async def test_generate_bluf_endpoint(db_session, mock_threat):
             )
             
             # Since we mock the DB, we must simulate the query returning a threat
-            db_session.execute.return_value.scalar_one_or_none.side_effect = [
+            from unittest.mock import MagicMock
+            mock_result = MagicMock()
+            mock_result.scalar_one_or_none.side_effect = [
                 mock_threat, # 1. Get threat context
                 None         # 2. Get existing BLUF report (None = create new)
             ]
+            db_session.execute.return_value = mock_result
             
             # For the fastapi dependency injection, we'd normally use the async_client and override get_db.
             # But we can just call the endpoint logic directly for unit testing if the environment is broken.

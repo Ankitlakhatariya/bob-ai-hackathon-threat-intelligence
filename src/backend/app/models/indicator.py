@@ -31,12 +31,12 @@ class Indicator(Base, TimestampMixin):
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     indicator: Mapped[str] = mapped_column(String(512), unique=True, index=True, nullable=False)
     indicator_type: Mapped[IndicatorType] = mapped_column(
-        SQLEnum(IndicatorType, name="indicator_type_enum", values_callable=lambda x: [e.value for e in x]),
+        SQLEnum(IndicatorType, native_enum=False, name="indicator_type_enum", values_callable=lambda x: [e.value for e in x]),
         nullable=False,
         index=True,
     )
     reputation: Mapped[IndicatorReputation] = mapped_column(
-        SQLEnum(IndicatorReputation, name="indicator_reputation_enum", values_callable=lambda x: [e.value for e in x]),
+        SQLEnum(IndicatorReputation, native_enum=False, name="indicator_reputation_enum", values_callable=lambda x: [e.value for e in x]),
         default=IndicatorReputation.UNKNOWN,
         nullable=False,
         index=True,

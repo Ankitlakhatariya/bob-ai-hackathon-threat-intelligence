@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { ArrowRight, RotateCw, Search, ShieldAlert } from 'lucide-react'
 import type { AlertSource, AlertStatus, Severity } from '../types/alert'
@@ -33,6 +33,14 @@ function formatTimestamp(value: string) {
     minute: '2-digit',
   })
 }
+
+export function Alerts() {
+  const [search, setSearch] = useState('')
+  const [severity, setSeverity] = useState<SeverityFilter>('all')
+  const [source, setSource] = useState<SourceFilter>('all')
+  const [status, setStatus] = useState<StatusFilter>('all')
+  const [sortKey, setSortKey] = useState<SortKey>('newest')
+  const [page, setPage] = useState(1)
 
   const params: Record<string, string> = {
     limit: String(PAGE_SIZE),
