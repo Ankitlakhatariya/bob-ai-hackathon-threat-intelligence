@@ -2,10 +2,9 @@ import uuid
 from datetime import datetime, timezone
 from enum import Enum
 from typing import List, Optional, Any
-from sqlalchemy import String, Integer, DateTime, Enum as SQLEnum, Index
-from sqlalchemy.dialects.postgresql import UUID, ARRAY, JSONB
+from sqlalchemy import String, Integer, DateTime, Enum as SQLEnum, Index, Uuid
 from sqlalchemy.orm import Mapped, mapped_column
-from app.database.database import Base, TimestampMixin
+from app.database.database import Base, TimestampMixin, StringArrayType, JsonDataType
 
 
 class IndicatorType(str, Enum):
@@ -28,7 +27,7 @@ class Indicator(Base, TimestampMixin):
     """Threat intelligence Indicator of Compromise (IOC)."""
     __tablename__ = "indicators"
 
-    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
     indicator: Mapped[str] = mapped_column(String(512), unique=True, index=True, nullable=False)
     indicator_type: Mapped[IndicatorType] = mapped_column(
         SQLEnum(IndicatorType, native_enum=False, name="indicator_type_enum", values_callable=lambda x: [e.value for e in x]),
@@ -53,11 +52,11 @@ class Indicator(Base, TimestampMixin):
         default=lambda: datetime.now(timezone.utc),
         nullable=False,
     )
-    tags: Mapped[List[str]] = mapped_column(ARRAY(String), default=list, nullable=False)
+    tags: Mapped[List[str]] = mapped_column(StringArrayType(), default=list, nullable=False)
     threat_actor: Mapped[Optional[str]] = mapped_column(String(128), index=True, nullable=True)
     campaign: Mapped[Optional[str]] = mapped_column(String(128), index=True, nullable=True)
     threat_type: Mapped[str] = mapped_column(String(128), default="general_threat", nullable=False)
-    raw_intelligence: Mapped[Optional[Any]] = mapped_column(JSONB, nullable=True)
+    raw_intelligence: Mapped[Optional[Any]] = mapped_column(JsonDataType(), nullable=True)
 
 
 Index("idx_indicators_search", Indicator.indicator, Indicator.indicator_type, Indicator.reputation)

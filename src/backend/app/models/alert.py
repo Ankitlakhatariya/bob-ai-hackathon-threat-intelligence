@@ -2,9 +2,8 @@ from datetime import datetime, timezone
 from enum import Enum
 from typing import List, Optional, Any
 from sqlalchemy import String, Text, Integer, DateTime, ForeignKey, Enum as SQLEnum, Index
-from sqlalchemy.dialects.postgresql import ARRAY, JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-from app.database.database import Base, TimestampMixin
+from app.database.database import Base, TimestampMixin, StringArrayType, JsonDataType
 
 
 class AlertSeverity(str, Enum):
@@ -66,9 +65,9 @@ class Alert(Base, TimestampMixin):
         nullable=True,
         index=True,
     )
-    mitre_techniques: Mapped[List[str]] = mapped_column(ARRAY(String), default=list, nullable=False)
-    indicators: Mapped[List[str]] = mapped_column(ARRAY(String), default=list, nullable=False)
-    raw_data: Mapped[Optional[Any]] = mapped_column(JSONB, nullable=True)
+    mitre_techniques: Mapped[List[str]] = mapped_column(StringArrayType(), default=list, nullable=False)
+    indicators: Mapped[List[str]] = mapped_column(StringArrayType(), default=list, nullable=False)
+    raw_data: Mapped[Optional[Any]] = mapped_column(JsonDataType(), nullable=True)
 
     # Ingestion telemetry & normalized fields for fast indexed filtering
     event_type: Mapped[Optional[str]] = mapped_column(String(128), nullable=True, index=True)
@@ -76,7 +75,7 @@ class Alert(Base, TimestampMixin):
     destination_ip: Mapped[Optional[str]] = mapped_column(String(45), nullable=True, index=True)
     hostname: Mapped[Optional[str]] = mapped_column(String(255), nullable=True, index=True)
     username: Mapped[Optional[str]] = mapped_column(String(255), nullable=True, index=True)
-    metadata_info: Mapped[Optional[Any]] = mapped_column(JSONB, nullable=True)
+    metadata_info: Mapped[Optional[Any]] = mapped_column(JsonDataType(), nullable=True)
 
     # Relationships
     threat = relationship("Threat", back_populates="alerts", foreign_keys=[related_threat_id])

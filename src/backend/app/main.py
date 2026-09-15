@@ -361,6 +361,17 @@ app.add_middleware(
 )
 
 
+# Auto-init middleware for serverless invocations where ASGI lifespan might not run
+@app.middleware("http")
+async def ensure_db_ready_middleware(request: Request, call_next):
+    try:
+        from app.database.init_db import init_database
+        await init_database()
+    except Exception as e:
+        logger.warning(f"DB auto-init notice in middleware: {e}")
+    return await call_next(request)
+
+
 # Structured Request Logging Middleware
 @app.middleware("http")
 async def log_requests(request: Request, call_next):

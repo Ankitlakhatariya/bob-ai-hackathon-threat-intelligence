@@ -1,17 +1,16 @@
 import uuid
 from datetime import datetime, timezone
 from typing import Optional, Any, List
-from sqlalchemy import String, Text, Integer, DateTime, ForeignKey, Index
-from sqlalchemy.dialects.postgresql import UUID, JSONB, ARRAY
+from sqlalchemy import String, Text, Integer, DateTime, ForeignKey, Index, Uuid
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-from app.database.database import Base, TimestampMixin
+from app.database.database import Base, TimestampMixin, StringArrayType, JsonDataType
 
 
 class Event(Base, TimestampMixin):
     """Normalized security telemetry event from ingestion."""
     __tablename__ = "events"
 
-    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
     alert_id: Mapped[Optional[str]] = mapped_column(
         String(64),
         ForeignKey("alerts.id", ondelete="CASCADE"),
@@ -42,9 +41,9 @@ class Event(Base, TimestampMixin):
     command_line: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     url: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    indicators: Mapped[List[str]] = mapped_column(ARRAY(String), default=list, nullable=False)
-    metadata_info: Mapped[Optional[Any]] = mapped_column(JSONB, nullable=True)
-    raw_data: Mapped[Optional[Any]] = mapped_column(JSONB, nullable=True)
+    indicators: Mapped[List[str]] = mapped_column(StringArrayType(), default=list, nullable=False)
+    metadata_info: Mapped[Optional[Any]] = mapped_column(JsonDataType(), nullable=True)
+    raw_data: Mapped[Optional[Any]] = mapped_column(JsonDataType(), nullable=True)
 
     # Relationships
     alert = relationship("Alert", back_populates="events")

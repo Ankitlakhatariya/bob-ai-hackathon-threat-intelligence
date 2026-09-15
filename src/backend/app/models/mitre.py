@@ -1,9 +1,8 @@
 import uuid
 from typing import List, Optional
-from sqlalchemy import String, Text, Integer, Boolean, ForeignKey, Index
-from sqlalchemy.dialects.postgresql import UUID, ARRAY
+from sqlalchemy import String, Text, Integer, Boolean, ForeignKey, Index, Uuid
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-from app.database.database import Base, TimestampMixin
+from app.database.database import Base, TimestampMixin, StringArrayType
 
 
 class MitreTactic(Base, TimestampMixin):
@@ -21,7 +20,7 @@ class MitreTechnique(Base, TimestampMixin):
 
     id: Mapped[str] = mapped_column(String(32), primary_key=True)  # e.g. T1190 or T1059.001
     name: Mapped[str] = mapped_column(String(255), nullable=False)
-    tactics: Mapped[List[str]] = mapped_column(ARRAY(String), default=list, nullable=False)
+    tactics: Mapped[List[str]] = mapped_column(StringArrayType(), default=list, nullable=False)
     description: Mapped[str] = mapped_column(Text, nullable=False)
     url: Mapped[str] = mapped_column(String(512), nullable=False)
     is_subtechnique: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
@@ -32,7 +31,7 @@ class ThreatMitreMapping(Base, TimestampMixin):
     """Maps threats/incidents to MITRE ATT&CK techniques with verified behavioral evidence."""
     __tablename__ = "threat_mitre_mappings"
 
-    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
     threat_id: Mapped[str] = mapped_column(
         String(64),
         ForeignKey("threats.id", ondelete="CASCADE"),

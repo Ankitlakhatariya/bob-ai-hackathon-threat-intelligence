@@ -1,7 +1,6 @@
 import uuid
 from typing import Optional
-from sqlalchemy import String, Text, Float, ForeignKey, Index
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy import String, Text, Float, ForeignKey, Index, Uuid
 from sqlalchemy.orm import Mapped, mapped_column
 from app.database.database import Base, TimestampMixin
 
@@ -10,7 +9,7 @@ class Correlation(Base, TimestampMixin):
     """Stores deterministic correlation links between alerts and threats."""
     __tablename__ = "correlations"
 
-    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
     alert_id: Mapped[str] = mapped_column(
         String(64),
         ForeignKey("alerts.id", ondelete="CASCADE"),

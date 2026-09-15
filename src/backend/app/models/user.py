@@ -1,7 +1,6 @@
 import uuid
 from typing import Optional
-from sqlalchemy import String, Boolean, Enum as SQLEnum
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy import String, Boolean, Enum as SQLEnum, Uuid
 from sqlalchemy.orm import Mapped, mapped_column
 from app.database.database import Base, TimestampMixin
 from app.core.permissions import UserRole
@@ -11,7 +10,7 @@ class User(Base, TimestampMixin):
     __tablename__ = "users"
 
     id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True),
+        Uuid,
         primary_key=True,
         default=uuid.uuid4,
     )

@@ -27,6 +27,6 @@ class DataSourceUpdate(BaseModel):
 class DataSourceRead(DataSourceBase):
     model_config = ConfigDict(from_attributes=True)
 
-    last_heartbeat: datetime
-    created_at: datetime
-    updated_at: datetime
+    last_heartbeat: Optional[datetime] = None
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None

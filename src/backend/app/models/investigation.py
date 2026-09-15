@@ -2,10 +2,9 @@ import uuid
 from datetime import datetime, timezone
 from enum import Enum
 from typing import Optional, List, Any
-from sqlalchemy import String, Text, DateTime, ForeignKey, Index
-from sqlalchemy.dialects.postgresql import UUID, JSONB
+from sqlalchemy import String, Text, DateTime, ForeignKey, Index, Uuid
 from sqlalchemy.orm import Mapped, mapped_column, relationship, synonym
-from app.database.database import Base, TimestampMixin
+from app.database.database import Base, TimestampMixin, JsonDataType
 
 
 class InvestigationStatus(str, Enum):
@@ -54,7 +53,7 @@ class Investigation(Base, TimestampMixin):
     """Investigation case tracking for SOC analysts."""
     __tablename__ = "investigations"
 
-    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
     threat_id: Mapped[Optional[str]] = mapped_column(
         String(64),
         ForeignKey("threats.id", ondelete="SET NULL"),
@@ -84,7 +83,7 @@ class Investigation(Base, TimestampMixin):
     notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     findings: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     resolution_summary: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    timeline_events: Mapped[Optional[Any]] = mapped_column(JSONB, default=list, nullable=True)
+    timeline_events: Mapped[Optional[Any]] = mapped_column(JsonDataType(), default=list, nullable=True)
     closed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
     # Synonym so queries like Investigation.assigned_analyst work identically
@@ -101,4 +100,3 @@ class Investigation(Base, TimestampMixin):
 Index("idx_investigations_status_priority", Investigation.status, Investigation.priority)
 Index("idx_investigations_threat_id", Investigation.threat_id)
 Index("idx_investigations_assigned_to", Investigation.assigned_to)
-

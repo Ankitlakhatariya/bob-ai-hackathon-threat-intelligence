@@ -1,9 +1,8 @@
 from datetime import datetime, timezone
 from typing import Any, Dict
 from sqlalchemy import String, Text, Integer, DateTime, ForeignKey, Float
-from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-from app.database.database import Base, TimestampMixin
+from app.database.database import Base, TimestampMixin, JsonDataType
 
 
 class LLMAnalysis(Base, TimestampMixin):
@@ -20,7 +19,7 @@ class LLMAnalysis(Base, TimestampMixin):
         nullable=False,
         index=True,
     )
-    output: Mapped[Dict[str, Any]] = mapped_column(JSONB, nullable=False)
+    output: Mapped[Dict[str, Any]] = mapped_column(JsonDataType(), nullable=False)
     confidence: Mapped[float] = mapped_column(Float, nullable=False)
 
     # Relationships

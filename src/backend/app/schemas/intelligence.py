@@ -49,7 +49,7 @@ class IndicatorRead(BaseModel):
     campaign: Optional[str] = None
     threat_type: Optional[str] = None
     raw_intelligence: Optional[Any] = None
-    created_at: datetime
+    created_at: Optional[datetime] = None
 
 
 class IndicatorLookupResponse(BaseModel):

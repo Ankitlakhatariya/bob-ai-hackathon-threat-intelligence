@@ -1,5 +1,6 @@
 from datetime import datetime, timezone
-from sqlalchemy import DateTime
+from sqlalchemy import DateTime, String, JSON
+from sqlalchemy.dialects.postgresql import ARRAY, JSONB
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 
@@ -19,3 +20,11 @@ class TimestampMixin:
         onupdate=lambda: datetime.now(timezone.utc),
         nullable=False,
     )
+
+
+def StringArrayType():
+    return ARRAY(String).with_variant(JSON, "sqlite")
+
+
+def JsonDataType():
+    return JSONB().with_variant(JSON, "sqlite")

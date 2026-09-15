@@ -2,9 +2,8 @@ from datetime import datetime, timezone
 from enum import Enum
 from typing import List, Optional, Any
 from sqlalchemy import String, Text, Integer, DateTime, Enum as SQLEnum, Index
-from sqlalchemy.dialects.postgresql import ARRAY, JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-from app.database.database import Base, TimestampMixin
+from app.database.database import Base, TimestampMixin, StringArrayType, JsonDataType
 
 
 class ThreatStatus(str, Enum):
@@ -45,8 +44,8 @@ class Threat(Base, TimestampMixin):
     risk_score: Mapped[int] = mapped_column(Integer, default=50, nullable=False, index=True)  # 0-100
     confidence: Mapped[int] = mapped_column(Integer, default=70, nullable=False)  # 0-100
     alert_count: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
-    affected_assets: Mapped[List[str]] = mapped_column(ARRAY(String), default=list, nullable=False)
-    scoring_factors: Mapped[Optional[Any]] = mapped_column(JSONB, nullable=True)
+    affected_assets: Mapped[List[str]] = mapped_column(StringArrayType(), default=list, nullable=False)
+    scoring_factors: Mapped[Optional[Any]] = mapped_column(JsonDataType(), nullable=True)
     first_seen: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         default=lambda: datetime.now(timezone.utc),
@@ -72,8 +71,8 @@ class Threat(Base, TimestampMixin):
         onupdate=lambda: datetime.now(timezone.utc),
         nullable=False,
     )
-    alert_ids: Mapped[List[str]] = mapped_column(ARRAY(String), default=list, nullable=False)
-    mitre_techniques: Mapped[List[str]] = mapped_column(ARRAY(String), default=list, nullable=False)
+    alert_ids: Mapped[List[str]] = mapped_column(StringArrayType(), default=list, nullable=False)
+    mitre_techniques: Mapped[List[str]] = mapped_column(StringArrayType(), default=list, nullable=False)
 
     # Relationships
     alerts = relationship("Alert", back_populates="threat", foreign_keys="[Alert.related_threat_id]")
