@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Activity, ChevronDown, ChevronUp, GitBranch, Network, RotateCw, Search, ShieldAlert } from 'lucide-react'
-import { getThreats, getThreatAlerts } from '../services/apiClient'
+import { getAlerts, getThreatAlerts, getThreats } from '../services/apiClient'
 import { severityColors } from '../lib/chartTheme'
 import { SeverityBadge } from '../components/severity/SeverityBadge'
 
@@ -200,16 +200,32 @@ function IncidentCard({
   onToggle: () => void
 }) {
   const [relatedAlerts, setRelatedAlerts] = useState<any[]>([])
+  const alertIds = incident.alert_ids ?? incident.alertIds ?? []
+  const reportedAlertCount = incident.alert_count ?? incident.alertCount
+  const alertCount = relatedAlerts.length || (alertIds.length > 0 ? alertIds.length : reportedAlertCount ?? 0)
 
   useEffect(() => {
     if (expanded) {
       let active = true
-      getThreatAlerts(incident.id).then(data => {
-        if (active) setRelatedAlerts(data)
-      }).catch(() => {})
+      getThreatAlerts(incident.id)
+        .then(async (data) => {
+          if (data.length > 0) return data
+
+          const allAlerts = await getAlerts()
+          const ids = new Set(alertIds)
+          return allAlerts.filter((alert) =>
+            alert.related_threat_id === incident.id ||
+            alert.relatedThreatId === incident.id ||
+            ids.has(alert.id),
+          )
+        })
+        .then((data) => {
+          if (active) setRelatedAlerts(data)
+        })
+        .catch(() => {})
       return () => { active = false }
     }
-  }, [expanded, incident.id])
+  }, [alertIds, expanded, incident.id])
 
   const timeline = useMemo(() => {
     const events = [
@@ -253,7 +269,7 @@ function IncidentCard({
             <p className="text-[10px] uppercase tracking-wider">demo value</p>
           </div>
           <span className="rounded-lg border border-border bg-surface-2 px-2.5 py-1.5 text-xs font-semibold">
-            {incident.alert_ids?.length || 0} alerts
+            {alertCount} {alertCount === 1 ? 'alert' : 'alerts'}
           </span>
           <span className="flex h-8 w-8 items-center justify-center text-foreground-muted">
             {expanded ? (
