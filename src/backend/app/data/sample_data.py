@@ -275,10 +275,11 @@ SAMPLE_THREATS = [
         "opened_at": NOW - timedelta(hours=4),
         "updated_at": NOW - timedelta(minutes=15),
         "scoring_factors": {
-            "severity_weight": 40,
-            "tactics_breadth": 25,
-            "blast_radius": 10,
-            "intel_match": 10,
+            "severity": 25,
+            "indicator_reputation": 20,
+            "correlation": 15,
+            "asset_criticality": 10,
+            "behavior": 15,
         },
     },
     {
@@ -300,10 +301,11 @@ SAMPLE_THREATS = [
         "opened_at": NOW - timedelta(hours=6),
         "updated_at": NOW - timedelta(hours=1),
         "scoring_factors": {
-            "severity_weight": 35,
-            "tactics_breadth": 20,
-            "blast_radius": 10,
-            "intel_match": 7,
+            "severity": 18,
+            "indicator_reputation": 14,
+            "correlation": 15,
+            "asset_criticality": 10,
+            "behavior": 15,
         },
     },
     {
@@ -325,10 +327,11 @@ SAMPLE_THREATS = [
         "opened_at": NOW - timedelta(hours=2),
         "updated_at": NOW - timedelta(minutes=5),
         "scoring_factors": {
-            "severity_weight": 45,
-            "tactics_breadth": 25,
-            "blast_radius": 12,
-            "intel_match": 10,
+            "severity": 25,
+            "indicator_reputation": 20,
+            "correlation": 17,
+            "asset_criticality": 15,
+            "behavior": 15,
         },
     },
     {
@@ -350,10 +353,11 @@ SAMPLE_THREATS = [
         "opened_at": NOW - timedelta(days=1),
         "updated_at": NOW - timedelta(hours=18),
         "scoring_factors": {
-            "severity_weight": 25,
-            "tactics_breadth": 10,
-            "blast_radius": 5,
-            "intel_match": 5,
+            "severity": 10,
+            "indicator_reputation": 8,
+            "correlation": 10,
+            "asset_criticality": 5,
+            "behavior": 12,
         },
     },
 ]

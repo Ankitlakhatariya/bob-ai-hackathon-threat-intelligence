@@ -363,7 +363,7 @@ async def get_threat_risk_breakdown(threat_id: str, db: AsyncSession = Depends(g
     return ThreatRiskResponse(
         risk_score=75,
         priority="HIGH",
-        factors={"severity_weight": 35, "tactics_breadth": 20, "blast_radius": 10, "intel_match": 10},
+        factors={"severity": 25, "indicator_reputation": 20, "correlation": 15, "asset_criticality": 10, "behavior": 15},
     )
 
 
